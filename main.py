@@ -1,77 +1,90 @@
-# import streamlit as st
-
-# def verificar_credenciais(usuario, senha):
-#     return usuario == "Master" and senha == "1235"
-
-# # Inicializa estados da sessão
-# if 'autenticado' not in st.session_state:
-#     st.session_state.autenticado = False
-# if 'usuarios' not in st.session_state:
-#     st.session_state.usuarios = {}
-
-# if not st.session_state.autenticado:
-#     with st.form("Login"):
-#         st.header("Acesso Restrito")
-#         usuario = st.text_input("Usuário Master")
-#         senha = st.text_input("Senha", type="password")
-        
-#         if st.form_submit_button("Entrar"):
-#             if verificar_credenciais(usuario, senha):
-#                 st.session_state.autenticado = True
-#                 st.rerun()
-#             else:
-#                 st.error("Credenciais inválidas")
-
-# else:
-#     st.success("✅ Autenticação bem-sucedida!")
-#     st.header("Cadastro de Novos Usuários")
-    
-#     with st.form("Cadastro"):
-#         novo_usuario = st.text_input("Novo Usuário")
-        
-#         # Seção de Permissões
-#         st.subheader("Privilégios do Usuário")
-#         col1, col2 = st.columns(2)
-#         with col1:
-#             perm_cadastrar_usuarios = st.checkbox("Cadastrar novos usuários")
-#             perm_cadastrar_produtos = st.checkbox("Cadastrar produtos")
-#             perm_estornar_produtos = st.checkbox("Estornar produtos")
-#         with col2:
-#             perm_emitir_venda = st.checkbox("Emitir Venda")
-#             perm_financeiro = st.checkbox("Financeiro")
-        
-#         # Campos de senha
-#         nova_senha = st.text_input("Nova Senha", type="password")
-#         confirmar_senha = st.text_input("Confirmar Senha", type="password")
-        
-#         if st.form_submit_button("Cadastrar"):
-#             if nova_senha != confirmar_senha:
-#                 st.error("As senhas não coincidem")
-#             elif novo_usuario in st.session_state.usuarios:
-#                 st.error("Usuário já existe")
-#             else:
-#                 # Armazena usuário com permissões
-#                 st.session_state.usuarios[novo_usuario] = {
-#                     'senha': nova_senha,
-#                     'permissoes': {
-#                         'cadastrar_usuarios': perm_cadastrar_usuarios,
-#                         'cadastrar_produtos': perm_cadastrar_produtos,
-#                         'estornar_produtos': perm_estornar_produtos,
-#                         'emitir_venda': perm_emitir_venda,
-#                         'financeiro': perm_financeiro
-#                     }
-#                 }
-#  
-# 
-# 
-#                st.success(f"Usuário {novo_usuario} cadastrado com sucesso!")
 import streamlit as st
+import pandas as pd
+
 from database import (
     criar_banco_de_dados,
     cadastrar_usuario_bd,
     buscar_usuario_bd,
-    buscar_usuario_pelo_login_bd
+    buscar_usuario_pelo_login_bd,
+    listar_usuarios_bd,
+    excluir_usuario_bd,
+    atualizar_usuario_bd
 )
+
+def gerenciar_usuarios():
+    """Lista todos os usuários em uma tabela e permite editar ou excluir."""
+    st.subheader("Gerenciar Usuários")
+    usuarios = listar_usuarios_bd()
+    
+    if not usuarios:
+        st.info("Nenhum usuário cadastrado.")
+        return
+    
+    # Converte para DataFrame para exibir em tabela
+    colunas = [
+        "id", 
+        "login", 
+        "senha",
+        "perm_cadastrar_usuarios", 
+        "perm_cadastrar_produtos",
+        "perm_estornar_produtos", 
+        "perm_emitir_venda",
+        "perm_financeiro"
+    ]
+    df = pd.DataFrame(usuarios, columns=colunas)
+    st.dataframe(df, use_container_width=True)
+
+    # Cria um selectbox para escolher qual usuário gerenciar
+    opcoes = [f"{u[0]} - {u[1]}" for u in usuarios]  # "id - login"
+    escolha = st.selectbox("Selecione um usuário para Editar ou Excluir:", opcoes)
+    
+    if escolha:
+        # Extrai o ID da escolha (tudo antes do ' - ')
+        user_id = int(escolha.split(' - ')[0])
+        
+        # Busca o usuário nos dados
+        user_info = next((u for u in usuarios if u[0] == user_id), None)
+        if user_info:
+            (id_, login_, senha_, 
+             perm_cad_usr, perm_cad_prod, 
+             perm_est_prod, perm_emit_venda, perm_fin) = user_info
+            
+            st.write(f"**Editando usuário:** {login_} (ID={id_})")
+            
+            # Formulário de edição
+            with st.form("editar_usuario"):
+                nova_senha = st.text_input(
+                    "Nova Senha (deixar em branco para não alterar)", 
+                    type="password"
+                )
+                perm_cad_usuarios_edit = st.checkbox("Cadastrar Usuários", value=bool(perm_cad_usr))
+                perm_cad_produtos_edit = st.checkbox("Cadastrar Produtos", value=bool(perm_cad_prod))
+                perm_est_prod_edit     = st.checkbox("Estornar Produtos", value=bool(perm_est_prod))
+                perm_emit_venda_edit   = st.checkbox("Emitir Venda", value=bool(perm_emit_venda))
+                perm_financeiro_edit   = st.checkbox("Financeiro", value=bool(perm_fin))
+
+                if st.form_submit_button("Salvar Alterações"):
+                    # Se a nova_senha estiver vazia, mantenha a senha anterior
+                    if not nova_senha:
+                        nova_senha = senha_  
+                    
+                    atualizar_usuario_bd(
+                        id_,
+                        nova_senha,
+                        perm_cad_usuarios_edit,
+                        perm_cad_produtos_edit,
+                        perm_est_prod_edit,
+                        perm_emit_venda_edit,
+                        perm_financeiro_edit
+                    )
+                    st.success(f"Usuário '{login_}' atualizado com sucesso!")
+                    st.rerun()
+
+            # Botão para excluir
+            if st.button("Excluir Usuário"):
+                excluir_usuario_bd(id_)
+                st.warning(f"Usuário '{login_}' excluído!")
+                st.rerun()
 
 def main():
     st.title("Sistema de Login - Exemplo")
@@ -142,7 +155,12 @@ def main():
                     else:
                         st.error(f"Não foi possível cadastrar. Usuário '{novo_login}' já existe!")
 
-        # Se não for Master, apenas exibe permissões
+            # Divisão
+            st.write("---")
+            st.header("Gerenciar Usuários Existentes")
+            gerenciar_usuarios()
+
+        # Se não for Master, apenas exibe permissões do usuário logado
         else:
             st.header("Minhas Permissões")
             user_info = buscar_usuario_pelo_login_bd(st.session_state.usuario_logado)
