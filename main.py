@@ -9,17 +9,13 @@ from database import (
     atualizar_usuario_bd
 )
 
-##############################
-# PÁGINAS (funções)          #
-##############################
-
-def pagina_cadastrar_usuarios():
-    st.title("Cadastrar Usuários")
-    st.write("Formulário ou lógica para cadastrar usuários... (exemplo)")
+################################################
+#  PÁGINAS (funções para cada permissão)
+################################################
 
 def pagina_cadastrar_produtos():
     st.title("Cadastrar Produtos")
-    st.write("Formulário ou lógica para cadastrar produtos... (exemplo)")
+    st.write("Conteúdo para cadastrar produtos... (exemplo)")
 
 def pagina_estornar_produtos():
     st.title("Estornar Produtos")
@@ -35,23 +31,68 @@ def pagina_financeiro():
 
 def pagina_gerenciar_usuarios():
     """
-    Exemplo da página onde o Master (ou quem tiver permissão) gerencia 
-    todos os usuários, podendo editar/excluir. 
+    Nesta página fazemos:
+      1. Cadastrar Novo Usuário (formulário)
+      2. Listar / Editar / Excluir Usuários cadastrados
     """
     st.title("Gerenciar Usuários")
+
+    ###########################
+    # FORMULÁRIO DE CADASTRO
+    ###########################
+    st.subheader("Cadastrar Novo Usuário")
+    with st.form("cadastro_novo_usuario"):
+        novo_login  = st.text_input("Novo Login")
+        nova_senha = st.text_input("Senha", type="password")
+
+        st.write("Permissões do Novo Usuário:")
+        perm_cad_produtos  = st.checkbox("Cadastrar Produtos")
+        perm_est_prod      = st.checkbox("Estornar Produtos")
+        perm_emit_venda    = st.checkbox("Emitir Venda")
+        perm_financeiro    = st.checkbox("Financeiro")
+        perm_geren_user    = st.checkbox("Gerenciar Usuários")
+
+        if st.form_submit_button("Cadastrar"):
+            # Chama a função do BD para inserir
+            sucesso = cadastrar_usuario_bd(
+                login=novo_login,
+                senha=nova_senha,
+                perm_cadastrar_produtos=perm_cad_produtos,
+                perm_estornar_produtos=perm_est_prod,
+                perm_emit_venda=perm_emit_venda,
+                perm_financeiro=perm_financeiro,
+                perm_gerenciar_usuarios=perm_geren_user
+            )
+            if sucesso:
+                st.success(f"Usuário '{novo_login}' cadastrado com sucesso!")
+            else:
+                st.error(f"Não foi possível cadastrar. Usuário '{novo_login}' já existe ou erro no banco.")
+
+    st.write("---")  # Divisor visual
+
+    ###########################
+    # LISTAR / EDITAR / EXCLUIR
+    ###########################
+    st.subheader("Lista de Usuários Cadastrados")
     usuarios = listar_usuarios_bd()
     
     if not usuarios:
         st.info("Nenhum usuário cadastrado.")
         return
     
+    # Cada linha do BD tem 8 colunas:
+    # (id, login, senha,
+    #  perm_cadastrar_produtos, perm_estornar_produtos,
+    #  perm_emitir_venda, perm_financeiro, perm_gerenciar_usuarios)
     colunas = [
-        "id", "login", "senha",
-        "perm_cadastrar_usuarios",
+        "id", 
+        "login", 
+        "senha",
         "perm_cadastrar_produtos",
         "perm_estornar_produtos",
         "perm_emitir_venda",
-        "perm_financeiro"
+        "perm_financeiro",
+        "perm_gerenciar_usuarios"
     ]
     df = pd.DataFrame(usuarios, columns=colunas)
     st.dataframe(df, use_container_width=True)
@@ -66,31 +107,34 @@ def pagina_gerenciar_usuarios():
         # Localiza o usuário selecionado
         user_info = next((u for u in usuarios if u[0] == user_id), None)
         if user_info:
-            (id_, login_, senha_, 
-             p_cad_usr, p_cad_prod, 
-             p_est_prod, p_emit_venda, p_fin) = user_info
-            
+            (id_, login_, senha_,
+             p_cad_prod, p_est_prod,
+             p_emit_venda, p_fin,
+             p_gerenciar) = user_info
+
             st.write(f"**Editando usuário:** {login_} (ID={id_})")
-            
+
             with st.form("editar_usuario"):
                 nova_senha = st.text_input("Nova Senha (vazio = não alterar)", type="password")
-                cad_usr_edit = st.checkbox("Cadastrar Usuários", value=bool(p_cad_usr))
-                cad_prod_edit = st.checkbox("Cadastrar Produtos", value=bool(p_cad_prod))
-                est_prod_edit = st.checkbox("Estornar Produtos", value=bool(p_est_prod))
+                cad_prod_edit   = st.checkbox("Cadastrar Produtos", value=bool(p_cad_prod))
+                est_prod_edit   = st.checkbox("Estornar Produtos", value=bool(p_est_prod))
                 emit_venda_edit = st.checkbox("Emitir Venda", value=bool(p_emit_venda))
-                fin_edit = st.checkbox("Financeiro", value=bool(p_fin))
+                fin_edit        = st.checkbox("Financeiro", value=bool(p_fin))
+                gerenciar_edit  = st.checkbox("Gerenciar Usuários", value=bool(p_gerenciar))
 
                 if st.form_submit_button("Salvar"):
+                    # Se a nova_senha estiver em branco, mantemos a senha anterior
                     if not nova_senha:
                         nova_senha = senha_
+                    # Função de update no banco
                     atualizar_usuario_bd(
-                        id_,
-                        nova_senha,
-                        cad_usr_edit,
-                        cad_prod_edit,
-                        est_prod_edit,
-                        emit_venda_edit,
-                        fin_edit
+                        user_id=id_,
+                        nova_senha=nova_senha,
+                        cad_produtos=cad_prod_edit,
+                        est_prod=est_prod_edit,
+                        emit_venda=emit_venda_edit,
+                        financeiro=fin_edit,
+                        gerenciar_usuarios=gerenciar_edit
                     )
                     st.success(f"Usuário {login_} atualizado!")
                     st.rerun()
@@ -101,10 +145,7 @@ def pagina_gerenciar_usuarios():
                 st.rerun()
 
 def pagina_minhas_permissoes():
-    """
-    Página que exibe as permissões do usuário logado.
-    Se quiser, poderia exibir do BD ou de st.session_state.
-    """
+    """Exibe as permissões do usuário logado."""
     st.title("Minhas Permissões")
     perms = st.session_state.get("permissoes", {})
     if not perms:
@@ -113,67 +154,52 @@ def pagina_minhas_permissoes():
     for k, v in perms.items():
         st.write(f"• {k}: **{v}**")
 
-##############################
-# FUNÇÃO PARA O MENU LATERAL #
-##############################
+################################################
+#  MENU LATERAL (um botão para cada permissão)
+################################################
 
 def exibir_menu_lateral(perms: dict):
-    """
-    Recebe as permissões do usuário como dicionário, ex.:
-    {
-      'cad_usuarios': True,
-      'cad_produtos': False,
-      ...
-    }
-    Para cada permissão = True, cria um botão na sidebar.
-    
-    Retorna uma string com o nome da página clicada, ou None se nada foi clicado.
-    """
     st.sidebar.title("Menu Lateral")
 
-    # Vamos criar um mapeamento:
-    # nome_interno -> (label_botao, funcao_da_pagina)
-    # Assim, podemos adicionar 'Gerenciar_Usuarios' se ele for master ou tiver alguma permissão especial
-    botoes = {}
+    pagina_clicada = None
 
-    # Exemplo: se perm_cadastrar_usuarios == True => botão "Cadastrar Usuários"
-    if perms.get("cadastrar_usuarios"):
-        botoes["cad_usuarios"] = "Cadastrar Usuários"
-        # Podemos também exibir "Gerenciar Usuários" se for master ou se decidir associar 
-        # a mesma permissão. Fica a seu critério.
-        botoes["gerenciar_usuarios"] = "Gerenciar Usuários"
+    # Se perm_gerenciar_usuarios for True, mostra "Gerenciar Usuários"
+    if perms.get("gerenciar_usuarios"):
+        if st.sidebar.button("Gerenciar Usuários"):
+            pagina_clicada = "gerenciar_usuarios"
 
     if perms.get("cadastrar_produtos"):
-        botoes["cad_produtos"] = "Cadastrar Produtos"
+        if st.sidebar.button("Cadastrar Produtos"):
+            pagina_clicada = "cad_produtos"
 
     if perms.get("estornar_produtos"):
-        botoes["estornar_produtos"] = "Estornar Produtos"
+        if st.sidebar.button("Estornar Produtos"):
+            pagina_clicada = "estornar_produtos"
 
     if perms.get("emitir_venda"):
-        botoes["emitir_venda"] = "Emitir Venda"
+        if st.sidebar.button("Emitir Venda"):
+            pagina_clicada = "emitir_venda"
 
     if perms.get("financeiro"):
-        botoes["financeiro"] = "Financeiro"
+        if st.sidebar.button("Financeiro"):
+            pagina_clicada = "financeiro"
 
-    # Sempre podemos ter "Minhas Permissões", se quiser
-    # ou associar a uma permissão de "visualizar_permissoes".
-    botoes["minhas_permissoes"] = "Minhas Permissões"
+    # Uma página geral que todo mundo pode ver
+    if st.sidebar.button("Minhas Permissões"):
+        pagina_clicada = "minhas_permissoes"
 
-    # Também um botão de "Sair"
-    botoes["sair"] = "Sair"
+    # Botão de sair
+    if st.sidebar.button("Sair"):
+        pagina_clicada = "sair"
 
-    pagina_clicada = None
-    for key, label in botoes.items():
-        if st.sidebar.button(label):
-            pagina_clicada = key
     return pagina_clicada
 
-##############################
-# MAIN (Login + Navegação)
-##############################
+################################################
+# MAIN
+################################################
 
 def main():
-    st.title("Sistema de Login - Exemplo")
+    st.title("Sistema de Login - Exemplo (Sem perm_cadastrar_usuarios)")
 
     criar_banco_de_dados()
 
@@ -185,38 +211,42 @@ def main():
         st.session_state.permissoes = {}
 
     if not st.session_state.autenticado:
-        # Exibe formulário de login
+        # LOGIN
         login_input = st.text_input("Login")
         senha_input = st.text_input("Senha", type="password")
 
         if st.button("Entrar"):
-            # Verifica se é Master
+            # Verifica Master (hard-coded)
             if login_input == "Master" and senha_input == "1235":
                 st.session_state.autenticado = True
                 st.session_state.usuario_logado = "Master"
-                # Define todas as permissões = True
+                # Master tem tudo liberado
                 st.session_state.permissoes = {
-                    'cadastrar_usuarios': True,
-                    'cadastrar_produtos': True,
-                    'estornar_produtos': True,
-                    'emitir_venda': True,
-                    'financeiro': True,
+                    "cadastrar_produtos":  True,
+                    "estornar_produtos":   True,
+                    "emitir_venda":        True,
+                    "financeiro":          True,
+                    "gerenciar_usuarios":  True
                 }
                 st.rerun()
             else:
-                # Verifica no BD
+                # Caso não seja Master, verifica no BD
                 user_db = buscar_usuario_bd(login_input, senha_input)
                 if user_db:
+                    # user_db = (id, login, senha,
+                    #            perm_cadastrar_produtos,
+                    #            perm_estornar_produtos,
+                    #            perm_emitir_venda,
+                    #            perm_financeiro,
+                    #            perm_gerenciar_usuarios)
                     st.session_state.autenticado = True
                     st.session_state.usuario_logado = user_db[1]  # login
-                    # user_db = (id, login, senha, perm1, perm2, perm3, perm4, perm5)
-                    # Precisamos mapear para st.session_state.permissoes:
                     st.session_state.permissoes = {
-                        'cadastrar_usuarios': bool(user_db[3]),
-                        'cadastrar_produtos': bool(user_db[4]),
-                        'estornar_produtos':  bool(user_db[5]),
-                        'emitir_venda':      bool(user_db[6]),
-                        'financeiro':        bool(user_db[7]),
+                        "cadastrar_produtos": bool(user_db[3]),
+                        "estornar_produtos":  bool(user_db[4]),
+                        "emitir_venda":      bool(user_db[5]),
+                        "financeiro":        bool(user_db[6]),
+                        "gerenciar_usuarios":bool(user_db[7])
                     }
                     st.rerun()
                 else:
@@ -225,18 +255,14 @@ def main():
         # Já autenticado
         st.success(f"Bem-vindo, {st.session_state.usuario_logado}!")
 
-        # Exibe menu lateral com base nas permissões
+        # Exibe menu lateral
         pagina_clicada = exibir_menu_lateral(st.session_state.permissoes)
-        
         if pagina_clicada:
             st.session_state["pagina_selecionada"] = pagina_clicada
-        
-        # Carrega a página que está selecionada
+
         pagina = st.session_state.get("pagina_selecionada", None)
 
-        if pagina == "cad_usuarios":
-            pagina_cadastrar_usuarios()
-        elif pagina == "gerenciar_usuarios":
+        if pagina == "gerenciar_usuarios":
             pagina_gerenciar_usuarios()
         elif pagina == "cad_produtos":
             pagina_cadastrar_produtos()
@@ -249,15 +275,13 @@ def main():
         elif pagina == "minhas_permissoes":
             pagina_minhas_permissoes()
         elif pagina == "sair":
-            # Botão "Sair" -> deslogar
             st.session_state.autenticado = False
             st.session_state.usuario_logado = ""
             st.session_state.permissoes = {}
             st.session_state.pagina_selecionada = None
             st.rerun()
         else:
-            # Nenhuma página selecionada ainda
-            st.write("Selecione alguma opção no menu lateral.")
+            st.write("Selecione uma das opções no menu lateral.")
 
 if __name__ == "__main__":
     main()
