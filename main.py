@@ -12,6 +12,9 @@ from database import (
     cadastrar_produto_bd,
     listar_produtos_bd,
     atualizar_produto_bd,
+    cadastrar_movimentacao,
+    listar_movimentacoes_bd,
+    criar_tabela_movimentos,
     excluir_produto_bd
 )
 
@@ -23,7 +26,7 @@ def pagina_cadastrar_produtos():
     st.title("Gerenciar Produtos")
 
     # Cria duas abas
-    tab1, tab2 = st.tabs(["Cadastrar/Editar Produtos", "Funcionalidade Futura"])
+    tab1, tab2 = st.tabs(["Cadastrar/Editar Produtos", "Entrada de Produtos"])
 
     with tab1:
         ###########################
@@ -86,10 +89,93 @@ def pagina_cadastrar_produtos():
                         st.success(f"Produto '{novo_nome}' atualizado com sucesso!")
                         st.rerun()
 
-    # Aba 2 (futura)
-    with tab2:
-        st.write("Em desenvolvimento...")
 
+
+    with tab2:
+        def pagina_entrada_produtos():
+            st.title("Entrada de Produtos")
+            
+            # Filtra os produtos ativos (Status = "Ativo")
+            produtos_todos = listar_produtos_bd()
+            produtos = [p for p in produtos_todos if p[3] == "Ativo"]  # p[3] é "Status"
+            
+            if produtos:
+                df = pd.DataFrame(produtos, columns=["ID", "Nome", "Info", "Status", "Preço"])
+                st.dataframe(df, use_container_width=True)
+                
+                # Combobox para selecionar o produto
+                opcoes = [f"{p[0]} - {p[1]}" for p in produtos]
+                escolha = st.selectbox("Selecione um produto para entrada:", opcoes)
+                
+                if escolha:
+                    produto_id = int(escolha.split(" - ")[0])
+                    produto_info = next((p for p in produtos if p[0] == produto_id), None)
+                    if produto_info:
+                        st.write(f"Produto selecionado: {escolha}")
+                        
+                        # Calcular o saldo atual do produto
+                        movimentos = listar_movimentacoes_bd()
+                        entradas = sum(m[5] for m in movimentos 
+                                    if m[2] == produto_info[1] 
+                                    and m[6].lower() == "entrada" 
+                                    and m[9].lower() == "ativo")
+                        saidas = sum(m[5] for m in movimentos 
+                                    if m[2] == produto_info[1] 
+                                    and m[6].lower() in ("saída", "saida") 
+                                    and m[9].lower() == "ativo")
+                        saldo_atual = entradas - saidas
+                        
+                        with st.form("form_entrada_produto"):
+                            # Ordem dos campos conforme solicitado:
+                            # 1. Quantidade a Registrar
+                            quantidade_nova = st.number_input("Quantidade a Registrar", min_value=1, step=1)
+                            # 2. Custo Inicial (ativo - usuário pode inserir)
+                            custo_inicial = st.number_input("Custo Inicial (por unidade)", min_value=0.0, format="%.2f")
+                            # 3. Preço de Venda (desabilitado - valor do produto)
+                            preco_venda = st.number_input("Preço de Venda (por unidade)", min_value=0.0,
+                                                        value=produto_info[4], disabled=True, format="%.2f")
+                            # 4. Saldo Atual (desabilitado)
+                            st.number_input("Saldo Atual", value=float(saldo_atual), disabled=True, format="%.0f")
+                            # 5. Método de Pagamento
+                            metodo_pagamento = st.selectbox("Método de Pagamento", ["Dinheiro", "Cartão", "Cheque", "Outro"])
+                            
+                            submit = st.form_submit_button("Registrar Entrada")
+                            
+                            if submit:
+                                usuario = st.session_state.get("usuario_logado", "Desconhecido")
+                                try:
+                                    cadastrar_movimentacao(
+                                        produto_nome=produto_info[1],
+                                        custo_inicial=custo_inicial,
+                                        preco_venda=produto_info[4],
+                                        quantidade=quantidade_nova,
+                                        tipo="entrada",
+                                        usuario=usuario,
+                                        metodo_pagamento=metodo_pagamento,
+                                        status="Ativo"
+                                    )
+                                    st.success("Entrada registrada com sucesso!")
+                                except Exception as e:
+                                    st.error(f"Erro ao registrar a entrada: {e}")
+                                st.rerun()
+            else:
+                st.info("Nenhum produto ativo cadastrado ainda.")
+            
+            st.write("---")
+            st.subheader("Relatório de Entradas Ativas")
+            movimentos = listar_movimentacoes_bd()
+            # Filtra as movimentações de entrada com status "Ativo"
+            entradas_ativas = [m for m in movimentos if m[6].lower() == "entrada" and m[9].lower() == "ativo"]
+            if entradas_ativas:
+                colunas = ["ID", "Data", "Produto", "Custo Inicial", "Preço de Venda", "Quantidade", 
+                        "Tipo", "Usuário", "Método Pagamento", "Status", "Total"]
+                df_entradas = pd.DataFrame(entradas_ativas, columns=colunas)
+                st.dataframe(df_entradas, use_container_width=True)
+            else:
+                st.info("Nenhuma movimentação de entrada ativa encontrada.")
+        
+        # Chama a função para exibir o conteúdo da Tab 2
+        pagina_entrada_produtos()
 
 
 def pagina_estornar_produtos():

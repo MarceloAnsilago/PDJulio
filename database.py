@@ -2,12 +2,13 @@ import sqlite3
 
 def criar_banco_de_dados():
     """
-    Cria (ou conecta) ao BD 'usuarios.db' e garante que as tabelas 'usuarios' e 'produtos' existam.
+    Cria (ou conecta) ao BD 'usuarios.db' e garante que as tabelas 'usuarios', 'produtos'
+    e 'movimentos' existam.
     """
     conn = sqlite3.connect("usuarios.db")
     cursor = conn.cursor()
 
-    # Tabela de USUÁRIOS
+    # Tabela de USUÁRIOS (sem a coluna perm_cadastrar_produtos)
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS usuarios (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -32,12 +33,29 @@ def criar_banco_de_dados():
         );
     """)
 
+    # Tabela de MOVIMENTOS
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS movimentos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            data TEXT NOT NULL,
+            nome TEXT NOT NULL,
+            custo_inicial REAL NOT NULL,
+            preco_venda REAL NOT NULL,
+            quantidade INTEGER NOT NULL,
+            tipo TEXT NOT NULL,              -- 'entrada' ou 'saída'
+            usuario TEXT NOT NULL,
+            metodo_pagamento TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'Ativo',
+            total REAL NOT NULL
+        );
+    """)
+
     conn.commit()
     conn.close()
 
-# ------------------------------------------------
-# USUÁRIOS
-# ------------------------------------------------
+# ----------------------------
+# Funções para USUÁRIOS
+# ----------------------------
 
 def cadastrar_usuario_bd(login, senha,
                          perm_cadastrar_produtos,
@@ -46,7 +64,7 @@ def cadastrar_usuario_bd(login, senha,
                          perm_financeiro,
                          perm_gerenciar_usuarios):
     """
-    Insere um novo usuário na tabela 'usuarios'. 
+    Insere um novo usuário na tabela 'usuarios'.
     """
     conn = sqlite3.connect("usuarios.db")
     cursor = conn.cursor()
@@ -73,7 +91,6 @@ def cadastrar_usuario_bd(login, senha,
         ))
         conn.commit()
     except sqlite3.IntegrityError:
-        # Se cair aqui, significa que já existe um usuário com esse login
         conn.close()
         return False
     conn.close()
@@ -137,7 +154,7 @@ def atualizar_usuario_bd(user_id, nova_senha,
                          financeiro,
                          gerenciar_usuarios):
     """
-    Atualiza senha e permissões (8 colunas).
+    Atualiza senha e permissões (8 colunas) do usuário.
     """
     conn = sqlite3.connect("usuarios.db")
     cursor = conn.cursor()
@@ -170,9 +187,9 @@ def excluir_usuario_bd(user_id):
     conn.commit()
     conn.close()
 
-# ------------------------------------------------
-# PRODUTOS
-# ------------------------------------------------
+# ----------------------------
+# Funções para PRODUTOS
+# ----------------------------
 
 def cadastrar_produto_bd(nome, info, status, preco):
     """Insere um produto na tabela 'produtos'."""
@@ -189,7 +206,7 @@ def cadastrar_produto_bd(nome, info, status, preco):
         conn.close()
         return False
     conn.close()
-    return produto_id  # Retorna o ID do novo produto
+    return produto_id
 
 def listar_produtos_bd():
     """Retorna todos os produtos cadastrados."""
@@ -219,9 +236,75 @@ def atualizar_produto_bd(produto_id, novo_nome, nova_info, novo_status, novo_pre
     conn.close()
 
 def excluir_produto_bd(produto_id):
-    """Exclui um produto definitivamente da tabela (ou poderia inativar)."""
+    """Exclui um produto definitivamente da tabela."""
     conn = sqlite3.connect("usuarios.db")
     cursor = conn.cursor()
     cursor.execute("DELETE FROM produtos WHERE id = ?", (produto_id,))
     conn.commit()
     conn.close()
+
+# ----------------------------
+# Funções para MOVIMENTOS
+# ----------------------------
+
+def criar_tabela_movimentos():
+    """
+    Cria (ou conecta) ao BD 'usuarios.db' e garante que a tabela 'movimentos' exista.
+    Essa tabela registra as movimentações (entrada ou saída) de produtos.
+    """
+    conn = sqlite3.connect("usuarios.db")
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS movimentos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            data TEXT NOT NULL,
+            nome TEXT NOT NULL,
+            custo_inicial REAL NOT NULL,
+            preco_venda REAL NOT NULL,
+            quantidade INTEGER NOT NULL,
+            tipo TEXT NOT NULL,              -- 'entrada' ou 'saída'
+            usuario TEXT NOT NULL,
+            metodo_pagamento TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'Ativo',
+            total REAL NOT NULL
+        );
+    """)
+    conn.commit()
+    conn.close()
+
+def cadastrar_movimentacao(produto_nome, custo_inicial, preco_venda, quantidade,
+                           tipo, usuario, metodo_pagamento, status="Ativo"):
+    """
+    Insere uma nova movimentação na tabela 'movimentos'.
+    Calcula o total (quantidade * custo_inicial) e registra a data atual.
+    """
+    import datetime
+    total = quantidade * custo_inicial  # Total calculado com base no custo inicial
+    data = datetime.datetime.now().isoformat(sep=" ", timespec="seconds")
+    conn = sqlite3.connect("usuarios.db")
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT INTO movimentos (
+            data, nome, custo_inicial, preco_venda, quantidade,
+            tipo, usuario, metodo_pagamento, status, total
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (data, produto_nome, custo_inicial, preco_venda, quantidade,
+          tipo, usuario, metodo_pagamento, status, total))
+    conn.commit()
+    conn.close()
+
+def listar_movimentacoes_bd():
+    """
+    Retorna todas as movimentações cadastradas.
+    """
+    conn = sqlite3.connect("usuarios.db")
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT id, data, nome, custo_inicial, preco_venda, quantidade,
+               tipo, usuario, metodo_pagamento, status, total
+        FROM movimentos
+    """)
+    rows = cursor.fetchall()
+    conn.close()
+    return rows
