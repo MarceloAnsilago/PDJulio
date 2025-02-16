@@ -2,21 +2,17 @@ import sqlite3
 
 def criar_banco_de_dados():
     """
-    Cria (ou conecta) ao BD 'usuarios.db' e garante que a tabela 'usuarios' exista,
-    sem a coluna 'perm_cadastrar_usuarios'.
+    Cria (ou conecta) ao BD 'usuarios.db' e garante que as tabelas 'usuarios' e 'produtos' existam.
     """
     conn = sqlite3.connect("usuarios.db")
     cursor = conn.cursor()
 
-    # Agora teremos 6 colunas de permissões:
-    # perm_cadastrar_produtos, perm_estornar_produtos, perm_emitir_venda,
-    # perm_financeiro, perm_gerenciar_usuarios
+    # Tabela de USUÁRIOS
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS usuarios (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             login TEXT UNIQUE NOT NULL,
             senha TEXT NOT NULL,
-
             perm_cadastrar_produtos  INTEGER DEFAULT 0,
             perm_estornar_produtos   INTEGER DEFAULT 0,
             perm_emitir_venda        INTEGER DEFAULT 0,
@@ -25,18 +21,32 @@ def criar_banco_de_dados():
         );
     """)
 
+    # Tabela de PRODUTOS
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS produtos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nome TEXT UNIQUE NOT NULL,
+            info_complementar TEXT,
+            status TEXT NOT NULL DEFAULT 'Ativo',
+            preco REAL NOT NULL DEFAULT 0
+        );
+    """)
+
     conn.commit()
     conn.close()
+
+# ------------------------------------------------
+# USUÁRIOS
+# ------------------------------------------------
 
 def cadastrar_usuario_bd(login, senha,
                          perm_cadastrar_produtos,
                          perm_estornar_produtos,
-                         perm_emit_venda,
+                         perm_emitir_venda,
                          perm_financeiro,
                          perm_gerenciar_usuarios):
     """
     Insere um novo usuário na tabela 'usuarios'. 
-    Observação: não há 'perm_cadastrar_usuarios' mais.
     """
     conn = sqlite3.connect("usuarios.db")
     cursor = conn.cursor()
@@ -57,7 +67,7 @@ def cadastrar_usuario_bd(login, senha,
             senha,
             int(perm_cadastrar_produtos),
             int(perm_estornar_produtos),
-            int(perm_emit_venda),
+            int(perm_emitir_venda),
             int(perm_financeiro),
             int(perm_gerenciar_usuarios)
         ))
@@ -157,5 +167,61 @@ def excluir_usuario_bd(user_id):
     conn = sqlite3.connect("usuarios.db")
     cursor = conn.cursor()
     cursor.execute("DELETE FROM usuarios WHERE id = ?", (user_id,))
+    conn.commit()
+    conn.close()
+
+# ------------------------------------------------
+# PRODUTOS
+# ------------------------------------------------
+
+def cadastrar_produto_bd(nome, info, status, preco):
+    """Insere um produto na tabela 'produtos'."""
+    conn = sqlite3.connect("usuarios.db")
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            INSERT INTO produtos (nome, info_complementar, status, preco)
+            VALUES (?, ?, ?, ?)
+        """, (nome, info, status, preco))
+        conn.commit()
+        produto_id = cursor.lastrowid
+    except sqlite3.IntegrityError:
+        conn.close()
+        return False
+    conn.close()
+    return produto_id  # Retorna o ID do novo produto
+
+def listar_produtos_bd():
+    """Retorna todos os produtos cadastrados."""
+    conn = sqlite3.connect("usuarios.db")
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT id, nome, info_complementar, status, preco
+        FROM produtos
+    """)
+    rows = cursor.fetchall()
+    conn.close()
+    return rows
+
+def atualizar_produto_bd(produto_id, novo_nome, nova_info, novo_status, novo_preco):
+    """Atualiza os dados de um produto."""
+    conn = sqlite3.connect("usuarios.db")
+    cursor = conn.cursor()
+    cursor.execute("""
+        UPDATE produtos
+        SET nome = ?,
+            info_complementar = ?,
+            status = ?,
+            preco = ?
+        WHERE id = ?
+    """, (novo_nome, nova_info, novo_status, novo_preco, produto_id))
+    conn.commit()
+    conn.close()
+
+def excluir_produto_bd(produto_id):
+    """Exclui um produto definitivamente da tabela (ou poderia inativar)."""
+    conn = sqlite3.connect("usuarios.db")
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM produtos WHERE id = ?", (produto_id,))
     conn.commit()
     conn.close()
