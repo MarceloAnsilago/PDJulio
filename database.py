@@ -162,7 +162,7 @@ def atualizar_usuario_bd(user_id, nova_senha,
         UPDATE usuarios
         SET senha = ?,
             perm_cadastrar_produtos  = ?,
-            perm_estornar_produtos   = ?,
+            perm_gerenciar_vendas  = ?,
             perm_emitir_venda        = ?,
             perm_financeiro          = ?,
             perm_gerenciar_usuarios  = ?

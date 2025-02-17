@@ -178,8 +178,8 @@ def pagina_cadastrar_produtos():
         pagina_entrada_produtos()
 
 
-def pagina_estornar_produtos():
-    st.title("Estornar Produtos")
+def pagina_gerenciar_vendas():
+    st.title("Gerenciar Vendas")
     st.write("Log de estornos, etc... (exemplo)")
 
 def pagina_emitir_venda():
@@ -208,21 +208,21 @@ def pagina_gerenciar_usuarios():
 
         st.write("Permissões do Novo Usuário:")
         perm_cad_produtos  = st.checkbox("Cadastrar Produtos")
-        perm_est_prod      = st.checkbox("Estornar Produtos")
+        perm_ger_vendas     = st.checkbox("Gerenciar Vendas")
         perm_emit_venda    = st.checkbox("Emitir Venda")
         perm_financeiro    = st.checkbox("Financeiro")
         perm_geren_user    = st.checkbox("Gerenciar Usuários")
 
         if st.form_submit_button("Cadastrar"):
             sucesso = cadastrar_usuario_bd(
-            login=novo_login,
-            senha=nova_senha,
-            perm_cadastrar_produtos=perm_cad_produtos,
-            perm_estornar_produtos=perm_est_prod,
-            perm_emitir_venda=perm_emit_venda,  # <--- agora usando o nome correto
-            perm_financeiro=perm_financeiro,
-            perm_gerenciar_usuarios=perm_geren_user
-        )
+                login=novo_login,
+                senha=nova_senha,
+                perm_cadastrar_produtos=perm_cad_produtos,
+                perm_estornar_produtos=perm_ger_vendas,
+                perm_emitir_venda=perm_emit_venda,
+                perm_financeiro=perm_financeiro,
+                perm_gerenciar_usuarios=perm_geren_user
+            )
             if sucesso:
                 st.success(f"Usuário '{novo_login}' cadastrado com sucesso!")
             else:
@@ -241,7 +241,7 @@ def pagina_gerenciar_usuarios():
         "login", 
         "senha",
         "perm_cadastrar_produtos",
-        "perm_estornar_produtos",
+        "perm_gerenciar_vendas",
         "perm_emitir_venda",
         "perm_financeiro",
         "perm_gerenciar_usuarios"
@@ -265,7 +265,7 @@ def pagina_gerenciar_usuarios():
             with st.form("editar_usuario"):
                 nova_senha = st.text_input("Nova Senha (vazio = não alterar)", type="password")
                 cad_prod_edit   = st.checkbox("Cadastrar Produtos", value=bool(p_cad_prod))
-                est_prod_edit   = st.checkbox("Estornar Produtos", value=bool(p_est_prod))
+                est_prod_edit   = st.checkbox("Gerenciar Vendas", value=bool(p_est_prod))
                 emit_venda_edit = st.checkbox("Emitir Venda", value=bool(p_emit_venda))
                 fin_edit        = st.checkbox("Financeiro", value=bool(p_fin))
                 gerenciar_edit  = st.checkbox("Gerenciar Usuários", value=bool(p_gerenciar))
@@ -319,7 +319,7 @@ def main():
                 st.session_state.usuario_logado = "Master"
                 st.session_state.permissoes = {
                     "cadastrar_produtos":  True,
-                    "estornar_produtos":   True,
+                    "gerenciar_vendas":   True,
                     "emitir_venda":        True,
                     "financeiro":          True,
                     "gerenciar_usuarios":  True
@@ -332,7 +332,7 @@ def main():
                     st.session_state.usuario_logado = user_db[1]
                     st.session_state.permissoes = {
                         "cadastrar_produtos": bool(user_db[3]),
-                        "estornar_produtos":  bool(user_db[4]),
+                        "gerenciar_vendas":  bool(user_db[4]),
                         "emitir_venda":      bool(user_db[5]),
                         "financeiro":        bool(user_db[6]),
                         "gerenciar_usuarios":bool(user_db[7])
@@ -352,8 +352,8 @@ def main():
         if perms.get("cadastrar_produtos"):
             menu_opcoes.append("Cadastrar Produtos")
             menu_icones.append("box-arrow-in-down")
-        if perms.get("estornar_produtos"):
-            menu_opcoes.append("Estornar Produtos")
+        if perms.get("gerenciar_vendas"):
+            menu_opcoes.append("Gerenciar Vendas")
             menu_icones.append("arrow-counterclockwise")
         if perms.get("emitir_venda"):
             menu_opcoes.append("Emitir Venda")
@@ -380,8 +380,8 @@ def main():
             pagina_gerenciar_usuarios()
         elif selected == "Cadastrar Produtos":
             pagina_cadastrar_produtos()
-        elif selected == "Estornar Produtos":
-            pagina_estornar_produtos()
+        elif selected == "Gerenciar Vendas":
+            pagina_gerenciar_vendas()            
         elif selected == "Emitir Venda":
             pagina_emitir_venda()
         elif selected == "Financeiro":
