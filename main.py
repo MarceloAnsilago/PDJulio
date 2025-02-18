@@ -277,6 +277,7 @@ def pagina_emitir_venda():
         for item in itens_remover:
             del st.session_state.carrinho[item]
             st.warning(f"{item} removido do carrinho.")
+            st.rerun()
         st.markdown(f"""
         <div style='background-color: #fffbeb; padding: 10px; border-radius: 8px;
         margin-top: 12px; border: 1px solid #ffd700; text-align: center;'>
@@ -346,10 +347,7 @@ def pagina_gerenciar_vendas():
 
     # Carrega todas as movimentações
     movimentos = listar_movimentacoes_bd()
-    # Cada linha de movimentos tem 12 colunas (id, num_operacao, data, nome, custo_inicial, preco_venda,
-    # quantidade, tipo, usuario, metodo_pagamento, status, total)
-    # Precisamos filtrar apenas as que tenham tipo="venda" (ou "saida"/"saída") e status="Ativo"
-
+  
     saidas_ativas = [
         m for m in movimentos
         if m[7].lower() in ("venda", "saida", "saída") and m[10].lower() == "ativo"
@@ -366,6 +364,37 @@ def pagina_gerenciar_vendas():
     else:
         st.info("Nenhuma venda ativa encontrada.")
 
+
+
+    
+    st.subheader("Pesquisar Venda por Número de Operação")
+    # Campo para pesquisar pelo número da operação (como número inteiro)
+    op_num_input = st.number_input("Digite o número da operação", min_value=0, value=0, step=1)
+    # Converte para string com 2 dígitos (ajuste se precisar de mais dígitos)
+    op_num_str = f"{op_num_input:02d}"
+    
+    st.markdown(f"**Procurando operação: {op_num_str}**")
+    
+    # Carrega todas as movimentações
+    movimentos = listar_movimentacoes_bd()
+    # Filtra apenas as vendas ativas (venda, saída, etc) que tenham o num_operacao igual ao digitado
+    vendas_filtradas = [
+        m for m in movimentos
+        if m[7].lower() in ("venda", "saída", "saida")
+           and m[10].lower() == "ativo"
+           and m[1] == op_num_str
+    ]
+    
+    if vendas_filtradas:
+        colunas = [
+            "ID", "Operação", "Data", "Produto",
+            "Custo Inicial", "Preço de Venda", "Quantidade",
+            "Tipo", "Usuário", "Método Pagamento", "Status", "Total"
+        ]
+        df_vendas = pd.DataFrame(vendas_filtradas, columns=colunas)
+        st.dataframe(df_vendas, use_container_width=True)
+    else:
+        st.info("Nenhuma venda ativa encontrada para esse número de operação.")
 
 
 
