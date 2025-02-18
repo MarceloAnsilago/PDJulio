@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from streamlit_option_menu import option_menu  # Biblioteca para menu estilizado
+import altair as alt
 
 from database import (
     criar_banco_de_dados,
@@ -499,9 +500,8 @@ def pagina_financeiro():
     st.markdown("<hr style='margin-top: 20px; margin-bottom: 20px;'>", unsafe_allow_html=True)
 
     # --- Abaixo do separador na página Financeiro ---
-
-    st.markdown("<hr style='margin-top: 20px; margin-bottom: 20px;'>", unsafe_allow_html=True)
-    st.subheader("Métricas por Produto")
+  
+    st.subheader("Métricas de lucro por Produto")
 
     # Carrega todas as movimentações
     movimentos = listar_movimentacoes_bd()
@@ -546,6 +546,57 @@ def pagina_financeiro():
         cols[i % num_colunas].metric(label=produto, value=valor_formatado, delta=f"{quantidade} vendidos")
         i += 1
 
+    # Separador abaixo dos cards financeiros
+    st.markdown("<hr style='margin-top: 20px; margin-bottom: 20px;'>", unsafe_allow_html=True)
+    st.subheader("Distribuição dos Métodos de Pagamento nas Vendas")
+
+    # Filtra as vendas ativas (assumindo que vendas é a lista filtrada com:
+    # m[9] => método de pagamento, m[7] => tipo, m[10] => status)
+    vendas = [m for m in listar_movimentacoes_bd() if m[7].lower() in ("venda", "saida", "saída") and m[10].lower() == "ativo"]
+
+    # Contabiliza os métodos de pagamento
+    metodos = {}
+    for m in vendas:
+        metodo = m[9]
+        # Normaliza os valores:
+        if metodo.lower() in ["dinheiro"]:
+            key = "Dinheiro"
+        elif metodo.lower() in ["pix"]:
+            key = "Pix"
+        elif metodo.lower() in ["cartão", "cartao"]:
+            key = "Cartão"
+        else:
+            key = "Outro"
+        metodos[key] = metodos.get(key, 0) + 1
+
+    # Cria um DataFrame para o gráfico
+    df_metodos = pd.DataFrame({
+        "Método": list(metodos.keys()),
+        "Quantidade": list(metodos.values())
+    })
+    df_metodos["Porcentagem"] = df_metodos["Quantidade"] / df_metodos["Quantidade"].sum() * 100
+
+    # Base do gráfico
+    base = alt.Chart(df_metodos).encode(
+        theta=alt.Theta(field="Quantidade", type="quantitative"),
+        color=alt.Color(field="Método", type="nominal", legend=alt.Legend(title="Método"))
+    )
+
+    # Gráfico de rosca (donut chart)
+    arc = base.mark_arc(innerRadius=50)
+    # Rótulos: exibe a quantidade dentro de cada segmento
+    text = base.mark_text(radius=80, color="black").encode(
+        text=alt.Text(field="Quantidade", type="quantitative")
+    )
+    text = base.mark_text(radius=80, color="black", fontSize=20).encode(
+    text=alt.Text(field="Quantidade", type="quantitative")
+    )
+
+    chart = (arc + text).properties(
+        title="Métodos de Pagamento nas Vendas"
+    )
+
+    st.altair_chart(chart, use_container_width=True)
 
 
 
