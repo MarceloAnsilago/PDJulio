@@ -192,7 +192,7 @@ def pagina_cadastrar_produtos():
 
 
 def pagina_emitir_venda():
-    st.title("🛒 PDV - Emitir Venda (Uma Única Coluna)")
+    st.title("🛒 PDV - Emitir Venda ")
 
     if "carrinho" not in st.session_state:
         st.session_state.carrinho = {}
@@ -593,7 +593,7 @@ def pagina_gerenciar_usuarios():
 ################################################
 
 def main():
-    st.title("Sistema de Login - Menu Lateral (option_menu)")
+    st.title("Gerenciador de Vendas 🛒")
 
     criar_banco_de_dados()
 
@@ -663,7 +663,7 @@ def main():
 
         with st.sidebar:
             selected = option_menu(
-                "Menu Lateral",
+                "Menu Permissões",
                 menu_opcoes,
                 icons=menu_icones,
                 menu_icon="cast",
