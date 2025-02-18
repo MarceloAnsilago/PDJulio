@@ -307,6 +307,7 @@ def pagina_emitir_venda():
         for item in itens_remover:
             del st.session_state.carrinho[item]
             st.warning(f"{item} removido do carrinho.")
+            st.rerun()
 
         st.markdown(f"""
         <div style='background-color: #fffbeb; padding: 10px; border-radius: 8px;
