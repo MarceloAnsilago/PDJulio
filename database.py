@@ -1,4 +1,6 @@
 import sqlite3
+import datetime
+import uuid
 
 def criar_banco_de_dados():
     """
@@ -8,7 +10,7 @@ def criar_banco_de_dados():
     conn = sqlite3.connect("usuarios.db")
     cursor = conn.cursor()
 
-    # Tabela de USUÁRIOS (sem a coluna perm_cadastrar_produtos)
+    # Tabela de USUÁRIOS (mantendo a coluna perm_estornar_produtos, conforme o schema atual)
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS usuarios (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -33,10 +35,11 @@ def criar_banco_de_dados():
         );
     """)
 
-    # Tabela de MOVIMENTOS
+    # Tabela de MOVIMENTOS com nova coluna num_operacao
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS movimentos (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            num_operacao TEXT,             -- Nova coluna para referência da operação
             data TEXT NOT NULL,
             nome TEXT NOT NULL,
             custo_inicial REAL NOT NULL,
@@ -162,7 +165,7 @@ def atualizar_usuario_bd(user_id, nova_senha,
         UPDATE usuarios
         SET senha = ?,
             perm_cadastrar_produtos  = ?,
-            perm_gerenciar_vendas  = ?,
+            perm_estornar_produtos   = ?,
             perm_emitir_venda        = ?,
             perm_financeiro          = ?,
             perm_gerenciar_usuarios  = ?
@@ -257,6 +260,7 @@ def criar_tabela_movimentos():
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS movimentos (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            num_operacao TEXT,             -- Nova coluna para a referência da operação
             data TEXT NOT NULL,
             nome TEXT NOT NULL,
             custo_inicial REAL NOT NULL,
@@ -272,27 +276,65 @@ def criar_tabela_movimentos():
     conn.commit()
     conn.close()
 
+import sqlite3
+import datetime
+
 def cadastrar_movimentacao(produto_nome, custo_inicial, preco_venda, quantidade,
                            tipo, usuario, metodo_pagamento, status="Ativo"):
     """
     Insere uma nova movimentação na tabela 'movimentos'.
-    Calcula o total (quantidade * custo_inicial) e registra a data atual.
+    
+    - Se tipo="entrada", total = quantidade * custo_inicial.
+    - Se tipo="venda", total = quantidade * preco_venda.
+    - Gera um número de operação sequencial (num_operacao).
     """
-    import datetime
-    total = quantidade * custo_inicial  # Total calculado com base no custo inicial
-    data = datetime.datetime.now().isoformat(sep=" ", timespec="seconds")
     conn = sqlite3.connect("usuarios.db")
     cursor = conn.cursor()
+
+    # 1. Gerar número de operação sequencial
+    cursor.execute("SELECT MAX(CAST(num_operacao AS INTEGER)) FROM movimentos")
+    result = cursor.fetchone()[0]
+    if result is None:
+        prox_num = 1
+    else:
+        prox_num = int(result) + 1
+    num_operacao = f"{prox_num:02d}"  # formata com dois dígitos, por exemplo
+
+    # 2. Calcular o total baseado no tipo
+    if tipo.lower() == "venda":
+        total = quantidade * preco_venda
+    else:
+        total = quantidade * custo_inicial
+
+    # 3. Data/hora atual
+    data = datetime.datetime.now().isoformat(sep=" ", timespec="seconds")
+
+    # 4. Inserir no banco
     cursor.execute("""
         INSERT INTO movimentos (
-            data, nome, custo_inicial, preco_venda, quantidade,
+            num_operacao, data, nome, custo_inicial, preco_venda, quantidade,
             tipo, usuario, metodo_pagamento, status, total
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (data, produto_nome, custo_inicial, preco_venda, quantidade,
-          tipo, usuario, metodo_pagamento, status, total))
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        num_operacao,
+        data,
+        produto_nome,
+        custo_inicial,
+        preco_venda,
+        quantidade,
+        tipo,
+        usuario,
+        metodo_pagamento,
+        status,
+        total
+    ))
     conn.commit()
     conn.close()
+
+    return num_operacao
+
+
 
 def listar_movimentacoes_bd():
     """
@@ -301,7 +343,7 @@ def listar_movimentacoes_bd():
     conn = sqlite3.connect("usuarios.db")
     cursor = conn.cursor()
     cursor.execute("""
-        SELECT id, data, nome, custo_inicial, preco_venda, quantidade,
+        SELECT id, num_operacao, data, nome, custo_inicial, preco_venda, quantidade,
                tipo, usuario, metodo_pagamento, status, total
         FROM movimentos
     """)

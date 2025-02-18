@@ -19,7 +19,7 @@ from database import (
 )
 
 ################################################
-# PÁGINAS (funções para cada permissão)
+#  PÁGINAS
 ################################################
 
 def pagina_cadastrar_produtos():
@@ -28,10 +28,10 @@ def pagina_cadastrar_produtos():
     # Cria duas abas
     tab1, tab2 = st.tabs(["Cadastrar/Editar Produtos", "Entrada de Produtos"])
 
+    ################################################
+    # Aba 1: Cadastrar/Editar Produtos
+    ################################################
     with tab1:
-        ###########################
-        # 1) FORMULÁRIO DE CADASTRO
-        ###########################
         st.subheader("Cadastrar Novo Produto")
         with st.form("cadastro_novo_produto"):
             nome = st.text_input("Nome do Produto")
@@ -47,104 +47,116 @@ def pagina_cadastrar_produtos():
                     st.error(f"Erro ao cadastrar o produto '{nome}'.")
 
         st.write("---")
-
-        ###########################
-        # 2) LISTAR PRODUTOS
-        ###########################
         st.subheader("Lista de Produtos Cadastrados")
+
         produtos = listar_produtos_bd()
         if not produtos:
             st.info("Nenhum produto cadastrado ainda.")
-            return  # Se não há produtos, encerra a função aqui
+            return
 
-        # Supondo que 'listar_produtos_bd()' retorne: (id, nome, info, status, preco)
+        # listar_produtos_bd() => (id, nome, info, status, preco)
         df = pd.DataFrame(produtos, columns=["ID", "Nome", "Info", "Status", "Preço"])
         st.dataframe(df, use_container_width=True)
 
-        ###########################
-        # 3) EDITAR PRODUTO
-        ###########################
-        opcoes = [f"{p[0]} - {p[1]}" for p in produtos]  # ex: "1 - Camiseta"
+        # Seletor para editar
+        opcoes = [f"{p[0]} - {p[1]}" for p in produtos]
         escolha = st.selectbox("Selecione um produto:", opcoes)
-
         if escolha:
             produto_id = int(escolha.split(" - ")[0])
             produto_info = next((p for p in produtos if p[0] == produto_id), None)
             if produto_info:
                 pid, pnome, pinfo, pstatus, ppreco = produto_info
-
                 st.write(f"**Editando produto:** {pnome} (ID={pid})")
+
                 with st.form("editar_produto"):
                     novo_nome = st.text_input("Nome do Produto", value=pnome)
                     novo_preco = st.number_input("Preço de Venda", value=ppreco, min_value=0.0, format="%.2f")
                     nova_info = st.text_area("Informações Complementares", value=pinfo)
                     novo_status = st.selectbox(
-                        "Status", 
-                        ["Ativo", "Inativo"], 
+                        "Status",
+                        ["Ativo", "Inativo"],
                         index=0 if pstatus == "Ativo" else 1
                     )
-
                     if st.form_submit_button("Alterar"):
                         atualizar_produto_bd(pid, novo_nome, nova_info, novo_status, novo_preco)
                         st.success(f"Produto '{novo_nome}' atualizado com sucesso!")
                         st.rerun()
 
-
-
+    ################################################
+    # Aba 2: Entrada de Produtos
+    ################################################
     with tab2:
         def pagina_entrada_produtos():
             st.title("Entrada de Produtos")
-            
-            # Filtra os produtos ativos (Status = "Ativo")
+
+            # Filtra os produtos ativos
             produtos_todos = listar_produtos_bd()
-            produtos = [p for p in produtos_todos if p[3] == "Ativo"]  # p[3] é "Status"
-            
-            if produtos:
-                df = pd.DataFrame(produtos, columns=["ID", "Nome", "Info", "Status", "Preço"])
+            produtos_ativos = [p for p in produtos_todos if p[3] == "Ativo"]  # p[3] => status
+
+            if produtos_ativos:
+                df = pd.DataFrame(produtos_ativos, columns=["ID", "Nome", "Info", "Status", "Preço"])
                 st.dataframe(df, use_container_width=True)
-                
-                # Combobox para selecionar o produto
-                opcoes = [f"{p[0]} - {p[1]}" for p in produtos]
+
+                # Combobox para selecionar produto
+                opcoes = [f"{p[0]} - {p[1]}" for p in produtos_ativos]
                 escolha = st.selectbox("Selecione um produto para entrada:", opcoes)
-                
+
                 if escolha:
                     produto_id = int(escolha.split(" - ")[0])
-                    produto_info = next((p for p in produtos if p[0] == produto_id), None)
+                    produto_info = next((p for p in produtos_ativos if p[0] == produto_id), None)
                     if produto_info:
                         st.write(f"Produto selecionado: {escolha}")
-                        
-                        # Calcular o saldo atual do produto
+                        # p => (id, nome, info, status, preco)
+                        # Vamos buscar as movimentações para calcular o saldo
                         movimentos = listar_movimentacoes_bd()
-                        entradas = sum(m[5] for m in movimentos 
-                                    if m[2] == produto_info[1] 
-                                    and m[6].lower() == "entrada" 
-                                    and m[9].lower() == "ativo")
-                        saidas = sum(m[5] for m in movimentos 
-                                    if m[2] == produto_info[1] 
-                                    and m[6].lower() in ("saída", "saida") 
-                                    and m[9].lower() == "ativo")
+                        # Estrutura de cada linha de movimentos (12 colunas):
+                        # 0: id
+                        # 1: num_operacao
+                        # 2: data
+                        # 3: nome
+                        # 4: custo_inicial
+                        # 5: preco_venda
+                        # 6: quantidade
+                        # 7: tipo
+                        # 8: usuario
+                        # 9: metodo_pagamento
+                        # 10: status
+                        # 11: total
+
+                        # Calcular entradas
+                        entradas = sum(
+                            m[6] for m in movimentos
+                            if m[3] == produto_info[1]  # m[3] => nome do produto
+                               and m[7].lower() == "entrada"
+                               and m[10].lower() == "ativo"
+                        )
+                        # Calcular saídas
+                        saidas = sum(
+                            m[6] for m in movimentos
+                            if m[3] == produto_info[1]
+                               and m[7].lower() in ("saída", "saida", "venda")
+                               and m[10].lower() == "ativo"
+                        )
                         saldo_atual = entradas - saidas
-                        
+
                         with st.form("form_entrada_produto"):
-                            # Ordem dos campos conforme solicitado:
-                            # 1. Quantidade a Registrar
+                            # Campos
                             quantidade_nova = st.number_input("Quantidade a Registrar", min_value=1, step=1)
-                            # 2. Custo Inicial (ativo - usuário pode inserir)
                             custo_inicial = st.number_input("Custo Inicial (por unidade)", min_value=0.0, format="%.2f")
-                            # 3. Preço de Venda (desabilitado - valor do produto)
-                            preco_venda = st.number_input("Preço de Venda (por unidade)", min_value=0.0,
-                                                        value=produto_info[4], disabled=True, format="%.2f")
-                            # 4. Saldo Atual (desabilitado)
+                            preco_venda = st.number_input(
+                                "Preço de Venda (por unidade)",
+                                min_value=0.0,
+                                value=produto_info[4],
+                                disabled=True,
+                                format="%.2f"
+                            )
                             st.number_input("Saldo Atual", value=float(saldo_atual), disabled=True, format="%.0f")
-                            # 5. Método de Pagamento
                             metodo_pagamento = st.selectbox("Método de Pagamento", ["Dinheiro", "Cartão", "Cheque", "Outro"])
-                            
-                            submit = st.form_submit_button("Registrar Entrada")
-                            
-                            if submit:
+
+                            if st.form_submit_button("Registrar Entrada"):
                                 usuario = st.session_state.get("usuario_logado", "Desconhecido")
                                 try:
-                                    cadastrar_movimentacao(
+                                    operacao = cadastrar_movimentacao(
                                         produto_nome=produto_info[1],
                                         custo_inicial=custo_inicial,
                                         preco_venda=produto_info[4],
@@ -154,66 +166,83 @@ def pagina_cadastrar_produtos():
                                         metodo_pagamento=metodo_pagamento,
                                         status="Ativo"
                                     )
-                                    st.success("Entrada registrada com sucesso!")
+                                    st.success("Operação registrada com sucesso!")
+                                    st.info(f"Número da operação: {operacao}")
                                 except Exception as e:
-                                    st.error(f"Erro ao registrar a entrada: {e}")
+                                    st.error(f"Erro ao registrar a operação: {e}")
                                 st.rerun()
             else:
                 st.info("Nenhum produto ativo cadastrado ainda.")
-            
+
             st.write("---")
             st.subheader("Relatório de Entradas Ativas")
+
             movimentos = listar_movimentacoes_bd()
-            # Filtra as movimentações de entrada com status "Ativo"
-            entradas_ativas = [m for m in movimentos if m[6].lower() == "entrada" and m[9].lower() == "ativo"]
+            # Filtra movimentações de entrada com status "Ativo"
+            # m[7] => tipo, m[10] => status
+            entradas_ativas = [
+                m for m in movimentos
+                if m[7].lower() == "entrada" and m[10].lower() == "ativo"
+            ]
             if entradas_ativas:
-                colunas = ["ID", "Data", "Produto", "Custo Inicial", "Preço de Venda", "Quantidade", 
-                        "Tipo", "Usuário", "Método Pagamento", "Status", "Total"]
+                # Lembrando que agora temos 12 colunas:
+                # 0:id,1:num_operacao,2:data,3:nome,4:custo_inicial,5:preco_venda,
+                # 6:quantidade,7:tipo,8:usuario,9:metodo_pagamento,10:status,11:total
+                colunas = [
+                    "ID","Operação", "Data", "Produto",
+                    "Custo Inicial", "Preço de Venda", "Quantidade",
+                    "Tipo", "Usuário", "Método Pagamento",
+                    "Status", "Total"
+                ]
                 df_entradas = pd.DataFrame(entradas_ativas, columns=colunas)
                 st.dataframe(df_entradas, use_container_width=True)
             else:
                 st.info("Nenhuma movimentação de entrada ativa encontrada.")
-        
-        # Chama a função para exibir o conteúdo da Tab 2
+
+        # Chama a função
         pagina_entrada_produtos()
 
 
-
-
 def pagina_emitir_venda():
-    from database import (
-        listar_produtos_bd,
-        listar_movimentacoes_bd,
-        cadastrar_movimentacao
-    )
-
+    """
+    Emitir Venda em uma única coluna, com carrinho e saldo calculado.
+    custo_inicial = 0, preco_venda = preco do produto
+    """
     st.title("🛒 PDV - Emitir Venda (Uma Única Coluna)")
 
-    # Inicializa o carrinho na sessão, se ainda não existir
     if "carrinho" not in st.session_state:
         st.session_state.carrinho = {}
 
-    # Define que só haverá 1 coluna (modo mobile fixo)
     num_colunas = 1
     colunas = st.columns(num_colunas)
 
-    # Função para calcular o saldo atual de um produto
+    # Função para calcular o saldo
     def calcular_saldo(produto_nome, movimentos):
-        entradas = sum(m[5] for m in movimentos
-                       if m[2] == produto_nome and m[6].lower() == "entrada" and m[9].lower() == "ativo")
-        saidas = sum(m[5] for m in movimentos
-                     if m[2] == produto_nome and m[6].lower() in ("venda", "saída", "saida") and m[9].lower() == "ativo")
+        # Estrutura do movimento: 
+        # m[3] => nome, m[6] => quantidade, m[7] => tipo, m[10] => status
+        entradas = sum(
+            m[6] for m in movimentos
+            if m[3] == produto_nome
+               and m[7].lower() == "entrada"
+               and m[10].lower() == "ativo"
+        )
+        saidas = sum(
+            m[6] for m in movimentos
+            if m[3] == produto_nome
+               and m[7].lower() in ("venda", "saída", "saida")
+               and m[10].lower() == "ativo"
+        )
         return entradas - saidas
 
-    # Buscar produtos ativos e movimentações
+    # Buscar produtos ativos e movimentos
     produtos_db = listar_produtos_bd()
-    produtos_ativos = [p for p in produtos_db if p[3] == "Ativo"]  # p[3] é status
+    produtos_ativos = [p for p in produtos_db if p[3] == "Ativo"]  # p[3] => status
     movimentos = listar_movimentacoes_bd()
 
-    # Exibir produtos (todos em uma única coluna)
+    # Exibir cada produto
     for i, p in enumerate(produtos_ativos):
-        with colunas[0]:  # sempre a mesma coluna (índice 0)
-            # p: (id, nome, info, status, preco)
+        with colunas[0]:
+            # p => (id, nome, info, status, preco)
             pid, nome, info, status, preco = p
             saldo = calcular_saldo(nome, movimentos)
 
@@ -227,7 +256,6 @@ def pagina_emitir_venda():
                 value=1,
                 key=f"qtd_{i}"
             )
-
             msg_container = st.empty()
 
             # Botão para adicionar ao carrinho
@@ -240,7 +268,6 @@ def pagina_emitir_venda():
                     else:
                         st.session_state.carrinho[nome] = {"preco": preco, "quantidade": qtd_selecionada}
                     msg_container.success(f"{qtd_selecionada}x {nome} adicionado ao carrinho!")
-
             st.markdown("<hr style='border: 1px solid #ddd; margin: 10px 0;'>", unsafe_allow_html=True)
 
     # Exibir o carrinho
@@ -248,12 +275,9 @@ def pagina_emitir_venda():
     if st.session_state.carrinho:
         total = 0
         itens_remover = []
-
-        # Exibir itens do carrinho em cards
         for nome, item in st.session_state.carrinho.items():
             subtotal = item["preco"] * item["quantidade"]
             total += subtotal
-
             with st.container():
                 col1, col2 = st.columns([4, 1])
                 with col1:
@@ -268,8 +292,6 @@ def pagina_emitir_venda():
                 with col2:
                     if st.button(f"❌", key=f"remove_{nome}"):
                         itens_remover.append(nome)
-
-        # Remover itens marcados
         for item in itens_remover:
             del st.session_state.carrinho[item]
             st.warning(f"{item} removido do carrinho.")
@@ -281,52 +303,48 @@ def pagina_emitir_venda():
         </div>
         """, unsafe_allow_html=True)
 
-        # Escolha do método de pagamento
+        # Método de pagamento
         st.markdown("### 🏦 Escolha o método de pagamento:")
         metodo_pagamento = st.radio("Selecione uma opção:", ["Dinheiro", "Pix", "Cartão", "Outro"])
         if metodo_pagamento == "Outro":
             metodo_personalizado = st.text_input("Digite o método de pagamento:")
 
-        # Botão para finalizar a venda
+        # Botão para finalizar venda
         if st.button("Finalizar Venda"):
             usuario = st.session_state.get("usuario_logado", "Desconhecido")
             for nome, item in st.session_state.carrinho.items():
                 quantidade = item["quantidade"]
                 preco_unit = item["preco"]
                 try:
-                    # custo_inicial = 0 (como solicitado)
+                    # custo_inicial = 0 (para venda)
                     # preco_venda = preco_unit
-                    # A função no banco deve calcular total usando preco_venda
-                    cadastrar_movimentacao(
-                        produto_nome=nome,
-                        custo_inicial=0,       # custo inicial fixo em 0
-                        preco_venda=preco_unit,
-                        quantidade=quantidade,
-                        tipo="venda",
-                        usuario=usuario,
-                        metodo_pagamento=metodo_pagamento,
-                        status="Ativo"
-                    )
+                    operacao = cadastrar_movimentacao(
+                    produto_nome=nome,
+                    custo_inicial=0,        # ignorado no cálculo
+                    preco_venda=preco_unit, # usado para total se tipo="venda"
+                    quantidade=quantidade,
+                    tipo="venda",
+                    usuario=usuario,
+                    metodo_pagamento=metodo_pagamento,
+                    status="Ativo"
+                )
                 except Exception as e:
                     st.error(f"Erro ao registrar venda de {nome}: {e}")
             st.success("Venda finalizada com sucesso!")
             st.session_state.carrinho = {}
             st.rerun()
 
-        # Botão para limpar o carrinho
+        # Limpar Carrinho
         if st.button("🧹 Limpar Carrinho"):
             st.session_state.carrinho = {}
             st.success("Carrinho limpo!")
             st.rerun()
-
     else:
         st.markdown(
             "<div style='text-align: center; color: #6c757d; font-size: 18px;'>"
             "🛒 Seu carrinho está vazio.</div>",
             unsafe_allow_html=True,
         )
-
-
 
 def pagina_gerenciar_vendas():
     st.title("Gerenciar Vendas")
@@ -337,24 +355,15 @@ def pagina_financeiro():
     st.write("Resumo financeiro, relatórios... (exemplo)")
 
 def pagina_gerenciar_usuarios():
-    """
-    Nesta página:
-      1. Cadastra novo usuário (formulário)
-      2. Lista/edita/exclui usuários cadastrados
-    """
     st.title("Gerenciar Usuários")
 
-    ###########################
-    # FORMULÁRIO DE CADASTRO
-    ###########################
     st.subheader("Cadastrar Novo Usuário")
     with st.form("cadastro_novo_usuario"):
         novo_login  = st.text_input("Novo Login")
         nova_senha = st.text_input("Senha", type="password")
-
         st.write("Permissões do Novo Usuário:")
         perm_cad_produtos  = st.checkbox("Cadastrar Produtos")
-        perm_ger_vendas     = st.checkbox("Gerenciar Vendas")
+        perm_ger_vendas    = st.checkbox("Gerenciar Vendas")
         perm_emit_venda    = st.checkbox("Emitir Venda")
         perm_financeiro    = st.checkbox("Financeiro")
         perm_geren_user    = st.checkbox("Gerenciar Usuários")
@@ -377,27 +386,20 @@ def pagina_gerenciar_usuarios():
     st.write("---")
     st.subheader("Lista de Usuários Cadastrados")
     usuarios = listar_usuarios_bd()
-    
     if not usuarios:
         st.info("Nenhum usuário cadastrado.")
         return
-    
+
     colunas = [
-        "id", 
-        "login", 
-        "senha",
-        "perm_cadastrar_produtos",
-        "perm_gerenciar_vendas",
-        "perm_emitir_venda",
-        "perm_financeiro",
-        "perm_gerenciar_usuarios"
+        "id", "login", "senha",
+        "perm_cadastrar_produtos", "perm_gerenciar_vendas",
+        "perm_emit_venda", "perm_financeiro", "perm_gerenciar_usuarios"
     ]
     df = pd.DataFrame(usuarios, columns=colunas)
     st.dataframe(df, use_container_width=True)
 
     opcoes = [f"{u[0]} - {u[1]}" for u in usuarios]
     escolha = st.selectbox("Selecione um usuário:", opcoes)
-    
     if escolha:
         user_id = int(escolha.split(" - ")[0])
         user_info = next((u for u in usuarios if u[0] == user_id), None)
@@ -443,10 +445,8 @@ def pagina_gerenciar_usuarios():
 def main():
     st.title("Sistema de Login - Menu Lateral (option_menu)")
 
-    # Cria as tabelas 'usuarios' e 'produtos'
     criar_banco_de_dados()
 
-    # Inicializa variáveis de sessão
     if "autenticado" not in st.session_state:
         st.session_state.autenticado = False
     if "usuario_logado" not in st.session_state:
@@ -454,18 +454,17 @@ def main():
     if "permissoes" not in st.session_state:
         st.session_state.permissoes = {}
 
-    # Tela de LOGIN se não autenticado
     if not st.session_state.autenticado:
         login_input = st.text_input("Login")
         senha_input = st.text_input("Senha", type="password")
-
         if st.button("Entrar"):
+            # Verifica Master
             if login_input == "Master" and senha_input == "1235":
                 st.session_state.autenticado = True
                 st.session_state.usuario_logado = "Master"
                 st.session_state.permissoes = {
                     "cadastrar_produtos":  True,
-                    "gerenciar_vendas":   True,
+                    "gerenciar_vendas":    True,
                     "emitir_venda":        True,
                     "financeiro":          True,
                     "gerenciar_usuarios":  True
@@ -476,12 +475,13 @@ def main():
                 if user_db:
                     st.session_state.autenticado = True
                     st.session_state.usuario_logado = user_db[1]
+                    # user_db => (id, login, senha, perm_cad_prod, perm_est_prod, perm_emit_venda, perm_fin, perm_geren_user)
                     st.session_state.permissoes = {
                         "cadastrar_produtos": bool(user_db[3]),
-                        "gerenciar_vendas":  bool(user_db[4]),
-                        "emitir_venda":      bool(user_db[5]),
-                        "financeiro":        bool(user_db[6]),
-                        "gerenciar_usuarios":bool(user_db[7])
+                        "gerenciar_vendas":   bool(user_db[4]),
+                        "emitir_venda":       bool(user_db[5]),
+                        "financeiro":         bool(user_db[6]),
+                        "gerenciar_usuarios": bool(user_db[7])
                     }
                     st.rerun()
                 else:
@@ -527,7 +527,7 @@ def main():
         elif selected == "Cadastrar Produtos":
             pagina_cadastrar_produtos()
         elif selected == "Gerenciar Vendas":
-            pagina_gerenciar_vendas()            
+            pagina_gerenciar_vendas()
         elif selected == "Emitir Venda":
             pagina_emitir_venda()
         elif selected == "Financeiro":
