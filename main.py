@@ -249,13 +249,25 @@ def pagina_emitir_venda():
             st.markdown(f"### {nome} (✅ {saldo} disponíveis)")
             st.markdown(f"**💰 R$ {preco:.2f}**")
 
-            qtd_selecionada = st.number_input(
-                f"Quantidade de {nome}",
-                min_value=1,
-                max_value=saldo if saldo > 0 else 0,
-                value=1,
-                key=f"qtd_{i}"
-            )
+            # Verifica se há estoque disponível
+            if saldo > 0:
+                qtd_selecionada = st.number_input(
+                    f"Quantidade de {nome}",
+                    min_value=1,
+                    max_value=saldo,
+                    value=1,
+                    key=f"qtd_{i}"
+                )
+            else:
+                st.warning("Estoque esgotado!")
+                qtd_selecionada = st.number_input(
+                    f"Quantidade de {nome}",
+                    min_value=0,
+                    max_value=0,
+                    value=0,
+                    key=f"qtd_{i}",
+                    disabled=True
+                )
             msg_container = st.empty()
 
             # Botão para adicionar ao carrinho
