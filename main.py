@@ -470,6 +470,12 @@ def pagina_financeiro():
     total_venda_bruta = sum(m[11] for m in vendas)
     saldo = total_venda_bruta - total_despesa
     
+    # Define a cor do card do saldo com base no valor
+    if saldo < 0:
+        cor_saldo = "#f8d7da"  # vermelho claro para saldo negativo
+    else:
+        cor_saldo = "#d1ecf1"  # azul claro para saldo positivo
+
     # Exibir os resultados em três cards com HTML
     st.markdown(f"""
     <div style="display: flex; flex-direction: column; gap: 20px; margin-top: 20px;">
@@ -481,7 +487,7 @@ def pagina_financeiro():
             <h3>Total Venda Bruta</h3>
             <p style="font-size: 24px; font-weight: bold;">R$ {total_venda_bruta:.2f}</p>
         </div>
-        <div style="background-color: #d4edda; padding: 20px; border-radius: 8px; text-align: center;">
+        <div style="background-color: {cor_saldo}; padding: 20px; border-radius: 8px; text-align: center;">
             <h3>Saldo</h3>
             <p style="font-size: 24px; font-weight: bold;">R$ {saldo:.2f}</p>
         </div>
