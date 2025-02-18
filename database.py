@@ -331,3 +331,22 @@ def listar_movimentacoes_bd():
     rows = cursor.fetchall()
     conn.close()
     return rows
+
+def atualizar_movimentacao_venda(id_, nova_quantidade, novo_status):
+    import sqlite3
+    conn = sqlite3.connect("usuarios.db")
+    cursor = conn.cursor()
+    # Obter o preço de venda para recalcular o total
+    cursor.execute("SELECT preco_venda FROM movimentos WHERE id = ?", (id_,))
+    preco_venda = cursor.fetchone()[0]
+    novo_total = nova_quantidade * preco_venda
+    cursor.execute("""
+        UPDATE movimentos
+        SET quantidade = ?,
+            status = ?,
+            total = ?
+        WHERE id = ?
+    """, (nova_quantidade, novo_status, novo_total, id_))
+    conn.commit()
+    conn.close()
+

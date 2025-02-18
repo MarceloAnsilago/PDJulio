@@ -14,6 +14,7 @@ from database import (
     atualizar_produto_bd,
     cadastrar_movimentacao,
     listar_movimentacoes_bd,
+    atualizar_movimentacao_venda,
     criar_tabela_movimentos,
     excluir_produto_bd
 )
@@ -340,61 +341,116 @@ def pagina_emitir_venda():
             unsafe_allow_html=True,
         )
 
+def atualizar_movimentacao_venda(id_, nova_quantidade, novo_metodo, novo_status, novo_total):
+    """
+    Atualiza a movimentação de venda (quantidade, método, status e total) para o registro com o id fornecido.
+    """
+    import sqlite3
+    conn = sqlite3.connect("usuarios.db")
+    cursor = conn.cursor()
+    cursor.execute("""
+        UPDATE movimentos
+        SET quantidade = ?,
+            metodo_pagamento = ?,
+            status = ?,
+            total = ?
+        WHERE id = ?
+    """, (nova_quantidade, novo_metodo, novo_status, novo_total, id_))
+    conn.commit()
+    conn.close()
+
 def pagina_gerenciar_vendas():
     st.title("Gerenciar Vendas")
-
-    st.subheader("Relatório de Vendas Ativas")
-
+    
+    st.subheader("Relatório de Vendas")
     # Carrega todas as movimentações
     movimentos = listar_movimentacoes_bd()
-  
-    saidas_ativas = [
+    
+    # Filtra todas as vendas, independentemente do status, para a pesquisa
+    vendas = [
         m for m in movimentos
-        if m[7].lower() in ("venda", "saida", "saída") and m[10].lower() == "ativo"
+        if m[7].lower() in ("venda", "saida", "saída")
     ]
-
-    if saidas_ativas:
+    
+    # Radiobox para filtrar vendas Ativas ou Inativas
+    filtro_status = st.radio("Filtrar vendas por status:", ["Ativas", "Inativas"])
+    status_filter = "ativo" if filtro_status == "Ativas" else "inativo"
+    
+    # Filtra as vendas com base no status selecionado
+    vendas_filtradas_status = [m for m in vendas if m[10].lower() == status_filter]
+    
+    if vendas_filtradas_status:
         colunas = [
             "ID", "Operação", "Data", "Produto",
             "Custo Inicial", "Preço de Venda", "Quantidade",
             "Tipo", "Usuário", "Método Pagamento", "Status", "Total"
         ]
-        df_saidas = pd.DataFrame(saidas_ativas, columns=colunas)
-        st.dataframe(df_saidas, use_container_width=True)
+        df_vendas = pd.DataFrame(vendas_filtradas_status, columns=colunas)
+        st.dataframe(df_vendas, use_container_width=True)
     else:
-        st.info("Nenhuma venda ativa encontrada.")
-
-
-
+        st.info("Nenhuma venda encontrada para o status selecionado.")
     
+    st.markdown("---")
     st.subheader("Pesquisar Venda por Número de Operação")
-    # Campo para pesquisar pelo número da operação (como número inteiro)
+    # Campo para pesquisa: insere número da operação
     op_num_input = st.number_input("Digite o número da operação", min_value=0, value=0, step=1)
-    # Converte para string com 2 dígitos (ajuste se precisar de mais dígitos)
     op_num_str = f"{op_num_input:02d}"
-    
     st.markdown(f"**Procurando operação: {op_num_str}**")
     
-    # Carrega todas as movimentações
-    movimentos = listar_movimentacoes_bd()
-    # Filtra apenas as vendas ativas (venda, saída, etc) que tenham o num_operacao igual ao digitado
+    # Filtra as vendas com base no número de operação (além do status selecionado)
     vendas_filtradas = [
-        m for m in movimentos
-        if m[7].lower() in ("venda", "saída", "saida")
-           and m[10].lower() == "ativo"
-           and m[1] == op_num_str
+        m for m in vendas_filtradas_status if m[1] == op_num_str
     ]
     
     if vendas_filtradas:
-        colunas = [
-            "ID", "Operação", "Data", "Produto",
-            "Custo Inicial", "Preço de Venda", "Quantidade",
-            "Tipo", "Usuário", "Método Pagamento", "Status", "Total"
-        ]
-        df_vendas = pd.DataFrame(vendas_filtradas, columns=colunas)
-        st.dataframe(df_vendas, use_container_width=True)
+        # Cria uma combobox listando os produtos dessa venda
+        opcoes = [f"{m[3]} - Qtd: {m[6]} - Total: R$ {m[11]:.2f}" for m in vendas_filtradas]
+        selecao = st.selectbox("Selecione um produto da venda para editar/inativar:", opcoes)
+        
+        if selecao:
+            venda_selecionada = next((m for m in vendas_filtradas if f"{m[3]} - Qtd: {m[6]} - Total: R$ {m[11]:.2f}" == selecao), None)
+            if venda_selecionada:
+                (id_, num_operacao, data, produto, custo_inicial, preco_venda,
+                 quantidade, tipo, usuario, metodo_pagamento, status, total) = venda_selecionada
+                
+                st.markdown("### Dados da Venda Selecionada")
+                st.write(f"**Operação:** {num_operacao}")
+                st.write(f"**Produto:** {produto}")
+                st.write(f"**Quantidade Atual:** {quantidade}")
+                st.write(f"**Preço de Venda:** R$ {preco_venda:.2f}")
+                st.write(f"**Método de Pagamento:** {metodo_pagamento}")
+                st.write(f"**Total:** R$ {total:.2f}")
+                st.write(f"**Data:** {data}")
+                
+                with st.form("editar_venda_produto"):
+                    nova_quantidade = st.number_input("Nova Quantidade", min_value=1, value=quantidade, step=1)
+                    novo_metodo = st.selectbox(
+                        "Novo Método de Pagamento",
+                        ["Dinheiro", "Pix", "Cartão", "Cheque", "Outro"],
+                        index=["Dinheiro", "Pix", "Cartão", "Cheque", "Outro"].index(metodo_pagamento)
+                        if metodo_pagamento in ["Dinheiro", "Pix", "Cartão", "Cheque", "Outro"] else 0
+                    )
+                    # Checkbox com valor padrão marcado se a venda estiver inativa
+                    inativar = st.checkbox("Inativar esta venda", value=(status.lower() == "inativo"))
+                    submit = st.form_submit_button("Salvar Alterações")
+                    
+                    if submit:
+                        novo_status = "Inativo" if inativar else "Ativo"
+                        novo_total = nova_quantidade * preco_venda
+                        atualizar_movimentacao_venda(
+                            id_=id_,
+                            nova_quantidade=nova_quantidade,
+                            novo_metodo=novo_metodo,
+                            novo_status=novo_status,
+                            novo_total=novo_total
+                        )
+                        st.success("Venda atualizada com sucesso!")
+                        st.rerun()
+
     else:
         st.info("Nenhuma venda ativa encontrada para esse número de operação.")
+
+
 
 
 
