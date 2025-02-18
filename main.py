@@ -599,6 +599,141 @@ def pagina_financeiro():
     st.altair_chart(chart, use_container_width=True)
 
 
+    # Separador abaixo dos gráficos ou cards existentes
+    st.markdown("<hr style='margin-top: 20px; margin-bottom: 20px;'>", unsafe_allow_html=True)
+
+    st.subheader("Quantidade de Vendas por Produto")
+
+    # Filtra as vendas ativas (considerando "venda", "saida", "saída")
+    vendas = [m for m in listar_movimentacoes_bd() 
+            if m[7].lower() in ("venda", "saida", "saída") and m[10].lower() == "ativo"]
+
+    # Agrupa as vendas por produto, somando as quantidades
+    sales_data = {}
+    for m in vendas:
+        produto = m[3]  # Nome do produto
+        quantidade = m[6]  # Quantidade vendida
+        sales_data[produto] = sales_data.get(produto, 0) + quantidade
+
+    # Cria um DataFrame para o gráfico de barras
+    df_sales = pd.DataFrame({
+        "Produto": list(sales_data.keys()),
+        "Quantidade": list(sales_data.values())
+    })
+
+    # Cria o gráfico de barras usando Altair
+    bar_chart = alt.Chart(df_sales).mark_bar().encode(
+        x=alt.X("Produto:N", title="Produto", sort='-y'),
+        y=alt.Y("Quantidade:Q", title="Quantidade de Vendas"),
+        tooltip=[alt.Tooltip("Produto:N"), alt.Tooltip("Quantidade:Q", title="Qtd")]
+    ).properties(
+        title="Quantidade de Vendas por Produto",
+        width=600,
+        height=300
+    )
+
+    st.altair_chart(bar_chart, use_container_width=True)
+
+    st.markdown("<hr style='margin-top: 20px; margin-bottom: 20px;'>", unsafe_allow_html=True)
+    st.subheader("Lucro por Produto")
+
+    # Filtra as movimentações ativas
+    movimentos = listar_movimentacoes_bd()
+    # Entradas ativas: tipo "entrada"
+    entradas = [m for m in movimentos if m[7].lower() == "entrada" and m[10].lower() == "ativo"]
+    # Vendas ativas: tipo "venda", "saida" ou "saída"
+    vendas = [m for m in movimentos if m[7].lower() in ("venda", "saida", "saída") and m[10].lower() == "ativo"]
+
+    # Agrupa por produto
+    lucro_por_produto = {}
+    for m in vendas:
+        produto = m[3]
+        # Total de vendas para esse produto
+        total_venda = m[11]
+        lucro_por_produto[produto] = lucro_por_produto.get(produto, {"venda": 0, "entrada": 0})
+        lucro_por_produto[produto]["venda"] += total_venda
+
+    for m in entradas:
+        produto = m[3]
+        total_entrada = m[11]
+        if produto not in lucro_por_produto:
+            lucro_por_produto[produto] = {"venda": 0, "entrada": 0}
+        lucro_por_produto[produto]["entrada"] += total_entrada
+
+    # Calcula o lucro (venda - entrada) para cada produto
+    dados_lucro = {
+        "Produto": [],
+        "Lucro": []
+    }
+    for produto, dados in lucro_por_produto.items():
+        lucro = dados["venda"] - dados["entrada"]
+        dados_lucro["Produto"].append(produto)
+        dados_lucro["Lucro"].append(lucro)
+
+    df_lucro = pd.DataFrame(dados_lucro)
+
+    # Gráfico de barras para o lucro por produto
+    chart_lucro = alt.Chart(df_lucro).mark_bar().encode(
+        x=alt.X("Produto:N", title="Produto", sort='-y'),
+        y=alt.Y("Lucro:Q", title="Lucro (R$)"),
+        tooltip=[alt.Tooltip("Produto:N"), alt.Tooltip("Lucro:Q", title="Lucro (R$)", format=".2f")]
+    ).properties(
+        title="Lucro por Produto",
+        width=600,
+        height=300
+    )
+
+    st.altair_chart(chart_lucro, use_container_width=True)
+   # Separador abaixo do gráfico de vendas
+    st.markdown("<hr style='margin-top: 20px; margin-bottom: 20px;'>", unsafe_allow_html=True)
+    # Filtra as vendas ativas
+    vendas = [m for m in listar_movimentacoes_bd() 
+            if m[7].lower() in ("venda", "saida", "saída") and m[10].lower() == "ativo"]
+
+    # Agrupa as vendas por usuário (índice 8)
+    vendas_por_usuario = {}
+    for m in vendas:
+        usuario = m[8]  # índice 8: usuário
+        vendas_por_usuario[usuario] = vendas_por_usuario.get(usuario, 0) + 1
+
+    # Cria um DataFrame com os dados
+    df_usuarios = pd.DataFrame({
+        "Usuário": list(vendas_por_usuario.keys()),
+        "Vendas": list(vendas_por_usuario.values())
+    })
+    df_usuarios["Porcentagem"] = df_usuarios["Vendas"] / df_usuarios["Vendas"].sum() * 100
+
+    # Cria a base do gráfico de rosca
+    base = alt.Chart(df_usuarios).encode(
+        theta=alt.Theta(field="Vendas", type="quantitative"),
+        color=alt.Color(field="Usuário", type="nominal", legend=alt.Legend(title="Usuário"))
+    )
+
+    # Gráfico de rosca (donut)
+    arc = base.mark_arc(innerRadius=50)
+
+    # Adiciona rótulos com a quantidade de vendas
+    text = base.mark_text(radius=80, color="black", fontSize=14).encode(
+        text=alt.Text(field="Vendas", type="quantitative")
+    )
+
+    chart = (arc + text).properties(
+        title="Número de Vendas por Usuário"
+    )
+
+    st.altair_chart(chart, use_container_width=True)
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
