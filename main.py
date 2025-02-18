@@ -451,34 +451,52 @@ def pagina_gerenciar_vendas():
         st.info("Nenhuma venda ativa encontrada para esse número de operação.")
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 def pagina_financeiro():
     st.title("Financeiro")
-    st.write("Resumo financeiro, relatórios... (exemplo)")
+    st.subheader("Resumo Financeiro")
+    
+    # Carrega todas as movimentações
+    movimentos = listar_movimentacoes_bd()
+    # Cada movimento tem 12 colunas:
+    # 0: id, 1: num_operacao, 2: data, 3: nome, 4: custo_inicial, 5: preco_venda,
+    # 6: quantidade, 7: tipo, 8: usuario, 9: metodo_pagamento, 10: status, 11: total
+    
+    # Filtra entradas ativas
+    entradas = [m for m in movimentos if m[7].lower() == "entrada" and m[10].lower() == "ativo"]
+    # Filtra vendas ativas (considerando "venda", "saida" e "saída")
+    vendas = [m for m in movimentos if m[7].lower() in ("venda", "saida", "saída") and m[10].lower() == "ativo"]
+    
+    total_despesa = sum(m[11] for m in entradas)
+    total_venda_bruta = sum(m[11] for m in vendas)
+    saldo = total_venda_bruta - total_despesa
+    
+    # Exibir os resultados em três cards com HTML
+    st.markdown(f"""
+    <div style="display: flex; flex-direction: column; gap: 20px; margin-top: 20px;">
+        <div style="background-color: #f8d7da; padding: 20px; border-radius: 8px; text-align: center;">
+            <h3>Total Despesa</h3>
+            <p style="font-size: 24px; font-weight: bold;">R$ {total_despesa:.2f}</p>
+        </div>
+        <div style="background-color: #d1ecf1; padding: 20px; border-radius: 8px; text-align: center;">
+            <h3>Total Venda Bruta</h3>
+            <p style="font-size: 24px; font-weight: bold;">R$ {total_venda_bruta:.2f}</p>
+        </div>
+        <div style="background-color: #d4edda; padding: 20px; border-radius: 8px; text-align: center;">
+            <h3>Saldo</h3>
+            <p style="font-size: 24px; font-weight: bold;">R$ {saldo:.2f}</p>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+
+ # Separador abaixo dos cards
+    st.markdown("<hr style='margin-top: 20px; margin-bottom: 20px;'>", unsafe_allow_html=True)
+
+
+
+
+
+
 
 def pagina_gerenciar_usuarios():
     st.title("Gerenciar Usuários")
