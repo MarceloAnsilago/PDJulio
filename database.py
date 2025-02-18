@@ -276,62 +276,43 @@ def criar_tabela_movimentos():
     conn.commit()
     conn.close()
 
-import sqlite3
-import datetime
 
 def cadastrar_movimentacao(produto_nome, custo_inicial, preco_venda, quantidade,
-                           tipo, usuario, metodo_pagamento, status="Ativo"):
+                           tipo, usuario, metodo_pagamento, status="Ativo", num_operacao=None):
     """
     Insere uma nova movimentação na tabela 'movimentos'.
-    
     - Se tipo="entrada", total = quantidade * custo_inicial.
     - Se tipo="venda", total = quantidade * preco_venda.
-    - Gera um número de operação sequencial (num_operacao).
+    Gera um número de operação sequencial, a menos que um seja fornecido.
     """
-    conn = sqlite3.connect("usuarios.db")
-    cursor = conn.cursor()
-
-    # 1. Gerar número de operação sequencial
-    cursor.execute("SELECT MAX(CAST(num_operacao AS INTEGER)) FROM movimentos")
-    result = cursor.fetchone()[0]
-    if result is None:
-        prox_num = 1
-    else:
-        prox_num = int(result) + 1
-    num_operacao = f"{prox_num:02d}"  # formata com dois dígitos, por exemplo
-
-    # 2. Calcular o total baseado no tipo
+    # Calcular o total conforme o tipo
     if tipo.lower() == "venda":
         total = quantidade * preco_venda
     else:
         total = quantidade * custo_inicial
 
-    # 3. Data/hora atual
     data = datetime.datetime.now().isoformat(sep=" ", timespec="seconds")
-
-    # 4. Inserir no banco
+    
+    conn = sqlite3.connect("usuarios.db")
+    cursor = conn.cursor()
+    
+    # Se nenhum número de operação foi fornecido, gera um novo
+    if num_operacao is None:
+        cursor.execute("SELECT MAX(CAST(num_operacao AS INTEGER)) FROM movimentos")
+        result = cursor.fetchone()[0]
+        prox_num = 1 if result is None else int(result) + 1
+        num_operacao = f"{prox_num:02d}"  # Formata com 2 dígitos (ex: "01", "02", ...)
+    
     cursor.execute("""
         INSERT INTO movimentos (
             num_operacao, data, nome, custo_inicial, preco_venda, quantidade,
             tipo, usuario, metodo_pagamento, status, total
         )
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (
-        num_operacao,
-        data,
-        produto_nome,
-        custo_inicial,
-        preco_venda,
-        quantidade,
-        tipo,
-        usuario,
-        metodo_pagamento,
-        status,
-        total
-    ))
+    """, (num_operacao, data, produto_nome, custo_inicial, preco_venda, quantidade,
+          tipo, usuario, metodo_pagamento, status, total))
     conn.commit()
     conn.close()
-
     return num_operacao
 
 

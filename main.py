@@ -109,19 +109,6 @@ def pagina_cadastrar_produtos():
                         # p => (id, nome, info, status, preco)
                         # Vamos buscar as movimentações para calcular o saldo
                         movimentos = listar_movimentacoes_bd()
-                        # Estrutura de cada linha de movimentos (12 colunas):
-                        # 0: id
-                        # 1: num_operacao
-                        # 2: data
-                        # 3: nome
-                        # 4: custo_inicial
-                        # 5: preco_venda
-                        # 6: quantidade
-                        # 7: tipo
-                        # 8: usuario
-                        # 9: metodo_pagamento
-                        # 10: status
-                        # 11: total
 
                         # Calcular entradas
                         entradas = sum(
@@ -204,10 +191,6 @@ def pagina_cadastrar_produtos():
 
 
 def pagina_emitir_venda():
-    """
-    Emitir Venda em uma única coluna, com carrinho e saldo calculado.
-    custo_inicial = 0, preco_venda = preco do produto
-    """
     st.title("🛒 PDV - Emitir Venda (Uma Única Coluna)")
 
     if "carrinho" not in st.session_state:
@@ -216,40 +199,29 @@ def pagina_emitir_venda():
     num_colunas = 1
     colunas = st.columns(num_colunas)
 
-    # Função para calcular o saldo
     def calcular_saldo(produto_nome, movimentos):
-        # Estrutura do movimento: 
-        # m[3] => nome, m[6] => quantidade, m[7] => tipo, m[10] => status
         entradas = sum(
             m[6] for m in movimentos
-            if m[3] == produto_nome
-               and m[7].lower() == "entrada"
-               and m[10].lower() == "ativo"
+            if m[3] == produto_nome and m[7].lower() == "entrada" and m[10].lower() == "ativo"
         )
         saidas = sum(
             m[6] for m in movimentos
-            if m[3] == produto_nome
-               and m[7].lower() in ("venda", "saída", "saida")
-               and m[10].lower() == "ativo"
+            if m[3] == produto_nome and m[7].lower() in ("venda", "saída", "saida") and m[10].lower() == "ativo"
         )
         return entradas - saidas
 
-    # Buscar produtos ativos e movimentos
     produtos_db = listar_produtos_bd()
-    produtos_ativos = [p for p in produtos_db if p[3] == "Ativo"]  # p[3] => status
+    produtos_ativos = [p for p in produtos_db if p[3] == "Ativo"]
     movimentos = listar_movimentacoes_bd()
 
-    # Exibir cada produto
     for i, p in enumerate(produtos_ativos):
         with colunas[0]:
-            # p => (id, nome, info, status, preco)
             pid, nome, info, status, preco = p
             saldo = calcular_saldo(nome, movimentos)
 
             st.markdown(f"### {nome} (✅ {saldo} disponíveis)")
             st.markdown(f"**💰 R$ {preco:.2f}**")
-
-            # Verifica se há estoque disponível
+            
             if saldo > 0:
                 qtd_selecionada = st.number_input(
                     f"Quantidade de {nome}",
@@ -270,7 +242,6 @@ def pagina_emitir_venda():
                 )
             msg_container = st.empty()
 
-            # Botão para adicionar ao carrinho
             if st.button(f"🛍️ Adicionar {nome}", key=f"add_{i}"):
                 if qtd_selecionada > saldo:
                     msg_container.error("Quantidade indisponível no estoque!")
@@ -282,7 +253,6 @@ def pagina_emitir_venda():
                     msg_container.success(f"{qtd_selecionada}x {nome} adicionado ao carrinho!")
             st.markdown("<hr style='border: 1px solid #ddd; margin: 10px 0;'>", unsafe_allow_html=True)
 
-    # Exibir o carrinho
     st.markdown("## 🛒 Carrinho")
     if st.session_state.carrinho:
         total = 0
@@ -307,47 +277,57 @@ def pagina_emitir_venda():
         for item in itens_remover:
             del st.session_state.carrinho[item]
             st.warning(f"{item} removido do carrinho.")
-            st.rerun()
-
         st.markdown(f"""
         <div style='background-color: #fffbeb; padding: 10px; border-radius: 8px;
         margin-top: 12px; border: 1px solid #ffd700; text-align: center;'>
             <h4>💳 Total: R$ {total:.2f}</h4>
         </div>
         """, unsafe_allow_html=True)
-
-        # Método de pagamento
+        
         st.markdown("### 🏦 Escolha o método de pagamento:")
         metodo_pagamento = st.radio("Selecione uma opção:", ["Dinheiro", "Pix", "Cartão", "Outro"])
         if metodo_pagamento == "Outro":
             metodo_personalizado = st.text_input("Digite o método de pagamento:")
 
-        # Botão para finalizar venda
+        # Gerar um número de operação único para toda a venda
+        op_num = None
         if st.button("Finalizar Venda"):
             usuario = st.session_state.get("usuario_logado", "Desconhecido")
+            # Gera um único número de operação para toda a venda
             for nome, item in st.session_state.carrinho.items():
                 quantidade = item["quantidade"]
                 preco_unit = item["preco"]
-                try:
-                    # custo_inicial = 0 (para venda)
-                    # preco_venda = preco_unit
-                    operacao = cadastrar_movimentacao(
-                    produto_nome=nome,
-                    custo_inicial=0,        # ignorado no cálculo
-                    preco_venda=preco_unit, # usado para total se tipo="venda"
-                    quantidade=quantidade,
-                    tipo="venda",
-                    usuario=usuario,
-                    metodo_pagamento=metodo_pagamento,
-                    status="Ativo"
-                )
-                except Exception as e:
-                    st.error(f"Erro ao registrar venda de {nome}: {e}")
+                if op_num is None:
+                    # Para o primeiro item, gerar e capturar o número de operação
+                    op_num = cadastrar_movimentacao(
+                        produto_nome=nome,
+                        custo_inicial=0,  # custo_inicial para venda é 0
+                        preco_venda=preco_unit,
+                        quantidade=quantidade,
+                        tipo="venda",
+                        usuario=usuario,
+                        metodo_pagamento=metodo_pagamento,
+                        status="Ativo",
+                        num_operacao=None  # Gera novo
+                    )
+                else:
+                    # Para os demais, usar o mesmo número de operação
+                    cadastrar_movimentacao(
+                        produto_nome=nome,
+                        custo_inicial=0,
+                        preco_venda=preco_unit,
+                        quantidade=quantidade,
+                        tipo="venda",
+                        usuario=usuario,
+                        metodo_pagamento=metodo_pagamento,
+                        status="Ativo",
+                        num_operacao=op_num
+                    )
             st.success("Venda finalizada com sucesso!")
+            st.info(f"Número da operação: {op_num}")
             st.session_state.carrinho = {}
             st.rerun()
-
-        # Limpar Carrinho
+        
         if st.button("🧹 Limpar Carrinho"):
             st.session_state.carrinho = {}
             st.success("Carrinho limpo!")
@@ -361,7 +341,55 @@ def pagina_emitir_venda():
 
 def pagina_gerenciar_vendas():
     st.title("Gerenciar Vendas")
-    st.write("Log de estornos, etc... (exemplo)")
+
+    st.subheader("Relatório de Vendas Ativas")
+
+    # Carrega todas as movimentações
+    movimentos = listar_movimentacoes_bd()
+    # Cada linha de movimentos tem 12 colunas (id, num_operacao, data, nome, custo_inicial, preco_venda,
+    # quantidade, tipo, usuario, metodo_pagamento, status, total)
+    # Precisamos filtrar apenas as que tenham tipo="venda" (ou "saida"/"saída") e status="Ativo"
+
+    saidas_ativas = [
+        m for m in movimentos
+        if m[7].lower() in ("venda", "saida", "saída") and m[10].lower() == "ativo"
+    ]
+
+    if saidas_ativas:
+        colunas = [
+            "ID", "Operação", "Data", "Produto",
+            "Custo Inicial", "Preço de Venda", "Quantidade",
+            "Tipo", "Usuário", "Método Pagamento", "Status", "Total"
+        ]
+        df_saidas = pd.DataFrame(saidas_ativas, columns=colunas)
+        st.dataframe(df_saidas, use_container_width=True)
+    else:
+        st.info("Nenhuma venda ativa encontrada.")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 def pagina_financeiro():
     st.title("Financeiro")
