@@ -498,6 +498,53 @@ def pagina_financeiro():
  # Separador abaixo dos cards
     st.markdown("<hr style='margin-top: 20px; margin-bottom: 20px;'>", unsafe_allow_html=True)
 
+    # --- Abaixo do separador na página Financeiro ---
+
+    st.markdown("<hr style='margin-top: 20px; margin-bottom: 20px;'>", unsafe_allow_html=True)
+    st.subheader("Métricas por Produto")
+
+    # Carrega todas as movimentações
+    movimentos = listar_movimentacoes_bd()
+
+    # Filtra as movimentações ativas:
+    # Vendas (tipo: venda, saida, saída) e Entradas (tipo: entrada)
+    vendas = [m for m in movimentos if m[7].lower() in ("venda", "saida", "saída") and m[10].lower() == "ativo"]
+    entradas = [m for m in movimentos if m[7].lower() == "entrada" and m[10].lower() == "ativo"]
+
+    # Agrupar vendas por produto
+    vendas_por_produto = {}
+    for m in vendas:
+        produto = m[3]  # Nome do produto
+        quantidade = m[6]
+        total_venda = m[11]
+        if produto not in vendas_por_produto:
+            vendas_por_produto[produto] = {"quantidade": 0, "total_venda": 0}
+        vendas_por_produto[produto]["quantidade"] += quantidade
+        vendas_por_produto[produto]["total_venda"] += total_venda
+
+    # Agrupar entradas por produto
+    entradas_por_produto = {}
+    for m in entradas:
+        produto = m[3]  # Nome do produto
+        total_entrada = m[11]
+        if produto not in entradas_por_produto:
+            entradas_por_produto[produto] = 0
+        entradas_por_produto[produto] += total_entrada
+
+    # Define quantas colunas por linha (exemplo: 3)
+    num_colunas = 3
+    cols = st.columns(num_colunas)
+
+    i = 0
+    for produto, dados in vendas_por_produto.items():
+        total_venda = dados["total_venda"]
+        quantidade = dados["quantidade"]
+        total_entrada = entradas_por_produto.get(produto, 0)
+        lucro = total_venda - total_entrada
+        valor_formatado = f"R$ {lucro:.2f}"
+        # Exibe o card de métrica para o produto
+        cols[i % num_colunas].metric(label=produto, value=valor_formatado, delta=f"{quantidade} vendidos")
+        i += 1
 
 
 
