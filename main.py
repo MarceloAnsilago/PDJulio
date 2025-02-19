@@ -365,7 +365,6 @@ def pagina_cadastrar_produtos():
 
 
 
-
 def pagina_emitir_venda():
     st.title("🛒 PDV - Emitir Venda")
 
@@ -373,7 +372,7 @@ def pagina_emitir_venda():
         st.session_state.carrinho = {}
 
     # Duas colunas para distribuir os produtos
-    num_colunas = 2
+    num_colunas = 3
     colunas = st.columns(num_colunas)
 
     def calcular_saldo(produto_nome, movimentos):
@@ -559,10 +558,6 @@ def pagina_emitir_venda():
             "🛒 Seu carrinho está vazio.</div>",
             unsafe_allow_html=True,
         )
-
-
-
-
 
 
 
