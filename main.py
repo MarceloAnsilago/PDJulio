@@ -192,13 +192,188 @@ def pagina_cadastrar_produtos():
         pagina_entrada_produtos()
 
 
+# def pagina_emitir_venda():
+#     st.title("🛒 PDV - Emitir Venda ")
+
+#     if "carrinho" not in st.session_state:
+#         st.session_state.carrinho = {}
+
+#     num_colunas = 1
+#     colunas = st.columns(num_colunas)
+
+#     def calcular_saldo(produto_nome, movimentos):
+#         entradas = sum(
+#             m[6] for m in movimentos
+#             if m[3] == produto_nome and m[7].lower() == "entrada" and m[10].lower() == "ativo"
+#         )
+#         saidas = sum(
+#             m[6] for m in movimentos
+#             if m[3] == produto_nome and m[7].lower() in ("venda", "saída", "saida") and m[10].lower() == "ativo"
+#         )
+#         return entradas - saidas
+
+#     produtos_db = listar_produtos_bd()
+#     produtos_ativos = [p for p in produtos_db if p[3] == "Ativo"]
+#     movimentos = listar_movimentacoes_bd()
+
+#     for i, p in enumerate(produtos_ativos):
+#         with colunas[0]:
+#             pid, nome, info, status, preco = p
+#             saldo = calcular_saldo(nome, movimentos)
+
+#             st.markdown(f"### {nome} (✅ {saldo} disponíveis)")
+#             st.markdown(f"**💰 R$ {preco:.2f}**")
+            
+#             if saldo > 0:
+#                 qtd_selecionada = st.number_input(
+#                     f"Quantidade de {nome}",
+#                     min_value=1,
+#                     max_value=saldo,
+#                     value=1,
+#                     key=f"qtd_{i}"
+#                 )
+#             else:
+#                 st.warning("Estoque esgotado!")
+#                 qtd_selecionada = st.number_input(
+#                     f"Quantidade de {nome}",
+#                     min_value=0,
+#                     max_value=0,
+#                     value=0,
+#                     key=f"qtd_{i}",
+#                     disabled=True
+#                 )
+#             msg_container = st.empty()
+
+#             if st.button(f"🛍️ Adicionar {nome}", key=f"add_{i}"):
+#                 if qtd_selecionada > saldo:
+#                     msg_container.error("Quantidade indisponível no estoque!")
+#                 else:
+#                     if nome in st.session_state.carrinho:
+#                         st.session_state.carrinho[nome]["quantidade"] += qtd_selecionada
+#                     else:
+#                         st.session_state.carrinho[nome] = {"preco": preco, "quantidade": qtd_selecionada}
+#                     msg_container.success(f"{qtd_selecionada}x {nome} adicionado ao carrinho!")
+#             st.markdown("<hr style='border: 1px solid #ddd; margin: 10px 0;'>", unsafe_allow_html=True)
+
+#     st.markdown("## 🛒 Carrinho")
+#     if st.session_state.carrinho:
+#         total = 0
+#         itens_remover = []
+#         for nome, item in st.session_state.carrinho.items():
+#             subtotal = item["preco"] * item["quantidade"]
+#             total += subtotal
+#             with st.container():
+#                 col1, col2 = st.columns([4, 1])
+#                 with col1:
+#                     st.markdown(f"""
+#                     <div style='background-color: #f8f9fa; padding: 10px; border-radius: 8px;
+#                     margin-bottom: 8px; border: 1px solid #dee2e6;'>
+#                         <strong>{item['quantidade']}x {nome}</strong><br>
+#                         <span style='color: #6c757d;'>Preço unitário: R$ {item['preco']:.2f}</span><br>
+#                         <strong>Total: R$ {subtotal:.2f}</strong>
+#                     </div>
+#                     """, unsafe_allow_html=True)
+#                 with col2:
+#                     if st.button(f"❌", key=f"remove_{nome}"):
+#                         itens_remover.append(nome)
+#         for item in itens_remover:
+#             del st.session_state.carrinho[item]
+#             st.warning(f"{item} removido do carrinho.")
+#             st.rerun()
+#         st.markdown(f"""
+#         <div style='background-color: #fffbeb; padding: 10px; border-radius: 8px;
+#         margin-top: 12px; border: 1px solid #ffd700; text-align: center;'>
+#             <h4>💳 Total: R$ {total:.2f}</h4>
+#         </div>
+#         """, unsafe_allow_html=True)
+        
+#         st.markdown("### 🏦 Escolha o método de pagamento:")
+#         metodo_pagamento = st.radio("Selecione uma opção:", ["Dinheiro", "Pix", "Cartão", "Outro"])
+#         if metodo_pagamento == "Outro":
+#             metodo_personalizado = st.text_input("Digite o método de pagamento:")
+
+#         # Gerar um número de operação único para toda a venda
+#         op_num = None
+#         if st.button("Finalizar Venda"):
+#             usuario = st.session_state.get("usuario_logado", "Desconhecido")
+#             # Gera um único número de operação para toda a venda
+#             for nome, item in st.session_state.carrinho.items():
+#                 quantidade = item["quantidade"]
+#                 preco_unit = item["preco"]
+#                 if op_num is None:
+#                     # Para o primeiro item, gerar e capturar o número de operação
+#                     op_num = cadastrar_movimentacao(
+#                         produto_nome=nome,
+#                         custo_inicial=0,  # custo_inicial para venda é 0
+#                         preco_venda=preco_unit,
+#                         quantidade=quantidade,
+#                         tipo="venda",
+#                         usuario=usuario,
+#                         metodo_pagamento=metodo_pagamento,
+#                         status="Ativo",
+#                         num_operacao=None  # Gera novo
+#                     )
+#                 else:
+#                     # Para os demais, usar o mesmo número de operação
+#                     cadastrar_movimentacao(
+#                         produto_nome=nome,
+#                         custo_inicial=0,
+#                         preco_venda=preco_unit,
+#                         quantidade=quantidade,
+#                         tipo="venda",
+#                         usuario=usuario,
+#                         metodo_pagamento=metodo_pagamento,
+#                         status="Ativo",
+#                         num_operacao=op_num
+#                     )
+#             st.success("Venda finalizada com sucesso!")
+#             st.info(f"Número da operação: {op_num}")
+#             st.session_state.carrinho = {}
+#             st.rerun()
+        
+#         if st.button("🧹 Limpar Carrinho"):
+#             st.session_state.carrinho = {}
+#             st.success("Carrinho limpo!")
+#             st.rerun()
+#     else:
+#         st.markdown(
+#             "<div style='text-align: center; color: #6c757d; font-size: 18px;'>"
+#             "🛒 Seu carrinho está vazio.</div>",
+#             unsafe_allow_html=True,
+#         )
+
+# def atualizar_movimentacao_venda(id_, nova_quantidade, novo_metodo, novo_status, novo_total):
+#     """
+#     Atualiza a movimentação de venda (quantidade, método, status e total) para o registro com o id fornecido.
+#     """
+#     import sqlite3
+#     conn = sqlite3.connect("usuarios.db")
+#     cursor = conn.cursor()
+#     cursor.execute("""
+#         UPDATE movimentos
+#         SET quantidade = ?,
+#             metodo_pagamento = ?,
+#             status = ?,
+#             total = ?
+#         WHERE id = ?
+#     """, (nova_quantidade, novo_metodo, novo_status, novo_total, id_))
+#     conn.commit()
+#     conn.close()
+
+
+
+
+
+
+
 def pagina_emitir_venda():
-    st.title("🛒 PDV - Emitir Venda ")
+    st.title("🛒 PDV - Emitir Venda")
 
     if "carrinho" not in st.session_state:
         st.session_state.carrinho = {}
 
-    num_colunas = 1
+    # Duas colunas para distribuir os produtos
+    num_colunas = 2
     colunas = st.columns(num_colunas)
 
     def calcular_saldo(produto_nome, movimentos):
@@ -217,33 +392,76 @@ def pagina_emitir_venda():
     movimentos = listar_movimentacoes_bd()
 
     for i, p in enumerate(produtos_ativos):
-        with colunas[0]:
+        coluna = colunas[i % num_colunas]
+        with coluna:
+            # REMOVA o separador superior
+            # st.markdown("---")  # <- removido
+            
+            # Placeholder de imagem ocupando toda a largura da coluna
+            st.markdown(
+                """
+                <div style="
+                    width: 100%;
+                    margin: 0 auto 10px auto;
+                    position: relative;
+                    padding-top: 100%;
+                    border: 1px dashed #ccc;
+                    border-radius: 8px;
+                    overflow: hidden;
+                ">
+                    <div style="
+                        position: absolute;
+                        top: 0;
+                        left: 0;
+                        width: 100%;
+                        height: 100%;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        color: #ccc;
+                        font-size: 14px;
+                    ">
+                        Imagem
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+            
             pid, nome, info, status, preco = p
             saldo = calcular_saldo(nome, movimentos)
 
-            st.markdown(f"### {nome} (✅ {saldo} disponíveis)")
-            st.markdown(f"**💰 R$ {preco:.2f}**")
-            
-            if saldo > 0:
-                qtd_selecionada = st.number_input(
-                    f"Quantidade de {nome}",
-                    min_value=1,
-                    max_value=saldo,
-                    value=1,
-                    key=f"qtd_{i}"
-                )
-            else:
-                st.warning("Estoque esgotado!")
-                qtd_selecionada = st.number_input(
-                    f"Quantidade de {nome}",
-                    min_value=0,
-                    max_value=0,
-                    value=0,
-                    key=f"qtd_{i}",
-                    disabled=True
-                )
-            msg_container = st.empty()
+            # Exibe o nome do produto e a quantidade disponível
+            st.markdown(f"**{nome} ({saldo} disponíveis)**")
 
+            # Preço e input de quantidade em duas colunas
+            price_qtd_cols = st.columns([1, 1])
+            with price_qtd_cols[0]:
+                st.markdown(f"**R$ {preco:.2f}**")
+            with price_qtd_cols[1]:
+                if saldo > 0:
+                    qtd_selecionada = st.number_input(
+                        label="",
+                        min_value=1,
+                        max_value=saldo,
+                        value=1,
+                        key=f"qtd_{i}",
+                        label_visibility="collapsed"
+                    )
+                else:
+                    st.warning("Estoque esgotado!")
+                    qtd_selecionada = st.number_input(
+                        label="",
+                        min_value=0,
+                        max_value=0,
+                        value=0,
+                        key=f"qtd_{i}",
+                        disabled=True,
+                        label_visibility="collapsed"
+                    )
+
+            # Botão e feedback
+            msg_container = st.empty()
             if st.button(f"🛍️ Adicionar {nome}", key=f"add_{i}"):
                 if qtd_selecionada > saldo:
                     msg_container.error("Quantidade indisponível no estoque!")
@@ -253,8 +471,11 @@ def pagina_emitir_venda():
                     else:
                         st.session_state.carrinho[nome] = {"preco": preco, "quantidade": qtd_selecionada}
                     msg_container.success(f"{qtd_selecionada}x {nome} adicionado ao carrinho!")
-            st.markdown("<hr style='border: 1px solid #ddd; margin: 10px 0;'>", unsafe_allow_html=True)
+            
+            # Coloca apenas o separador NO FINAL do card
+            st.markdown("---")
 
+    # =========== Carrinho ===========
     st.markdown("## 🛒 Carrinho")
     if st.session_state.carrinho:
         total = 0
@@ -280,6 +501,7 @@ def pagina_emitir_venda():
             del st.session_state.carrinho[item]
             st.warning(f"{item} removido do carrinho.")
             st.rerun()
+
         st.markdown(f"""
         <div style='background-color: #fffbeb; padding: 10px; border-radius: 8px;
         margin-top: 12px; border: 1px solid #ffd700; text-align: center;'>
@@ -292,29 +514,25 @@ def pagina_emitir_venda():
         if metodo_pagamento == "Outro":
             metodo_personalizado = st.text_input("Digite o método de pagamento:")
 
-        # Gerar um número de operação único para toda a venda
         op_num = None
         if st.button("Finalizar Venda"):
             usuario = st.session_state.get("usuario_logado", "Desconhecido")
-            # Gera um único número de operação para toda a venda
             for nome, item in st.session_state.carrinho.items():
                 quantidade = item["quantidade"]
                 preco_unit = item["preco"]
                 if op_num is None:
-                    # Para o primeiro item, gerar e capturar o número de operação
                     op_num = cadastrar_movimentacao(
                         produto_nome=nome,
-                        custo_inicial=0,  # custo_inicial para venda é 0
+                        custo_inicial=0,
                         preco_venda=preco_unit,
                         quantidade=quantidade,
                         tipo="venda",
                         usuario=usuario,
                         metodo_pagamento=metodo_pagamento,
                         status="Ativo",
-                        num_operacao=None  # Gera novo
+                        num_operacao=None
                     )
                 else:
-                    # Para os demais, usar o mesmo número de operação
                     cadastrar_movimentacao(
                         produto_nome=nome,
                         custo_inicial=0,
@@ -342,23 +560,15 @@ def pagina_emitir_venda():
             unsafe_allow_html=True,
         )
 
-def atualizar_movimentacao_venda(id_, nova_quantidade, novo_metodo, novo_status, novo_total):
-    """
-    Atualiza a movimentação de venda (quantidade, método, status e total) para o registro com o id fornecido.
-    """
-    import sqlite3
-    conn = sqlite3.connect("usuarios.db")
-    cursor = conn.cursor()
-    cursor.execute("""
-        UPDATE movimentos
-        SET quantidade = ?,
-            metodo_pagamento = ?,
-            status = ?,
-            total = ?
-        WHERE id = ?
-    """, (nova_quantidade, novo_metodo, novo_status, novo_total, id_))
-    conn.commit()
-    conn.close()
+
+
+
+
+
+
+
+
+
 
 def pagina_gerenciar_vendas():
     st.title("Gerenciar Vendas")
@@ -450,6 +660,25 @@ def pagina_gerenciar_vendas():
 
     else:
         st.info("Nenhuma venda ativa encontrada para esse número de operação.")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 def pagina_financeiro():
